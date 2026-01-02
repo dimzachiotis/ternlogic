@@ -3,7 +3,9 @@ import difflogic_cuda
 import numpy as np
 from .functional import bin_op_s, get_unique_connections, GradFactor
 from .packbitstensor import PackBitsTensor
-
+"""
+   uses modules initialized in files functional.py and packbitstensor.py
+"""
 
 ########################################################################################################################
 
@@ -12,6 +14,7 @@ class LogicLayer(torch.nn.Module):
     """
     The core module for differentiable logic gate networks. Provides a differentiable logic gate layer.
     """
+    """Represents a layer of neurons that have been replaced by logic gates"""
     def __init__(
             self,
             in_dim: int,
@@ -31,6 +34,11 @@ class LogicLayer(torch.nn.Module):
         """
         super().__init__()
         self.weights = torch.nn.parameter.Parameter(torch.randn(out_dim, 16, device=device))
+        """
+          creates a matrix of shape (out-dim)x(16) with random variables that follow the N(0,1). Then it marks it as trainable 
+          and registers it with the module, so it can be trained through collable python ready functions. Without Parameter the 
+          tensor would be treated as a constant.
+        """
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.device = device
@@ -42,6 +50,7 @@ class LogicLayer(torch.nn.Module):
         1. To provide an easy-to-understand implementation of differentiable logic gate networks 
         2. To provide a CPU implementation of differentiable logic gate networks 
         """
+        """ Implemenation selection"""
         self.implementation = implementation
         if self.implementation is None and device == 'cuda':
             self.implementation = 'cuda'
@@ -49,10 +58,12 @@ class LogicLayer(torch.nn.Module):
             self.implementation = 'python'
         assert self.implementation in ['cuda', 'python'], self.implementation
 
+        """ Connection stragedy"""
         self.connections = connections
         assert self.connections in ['random', 'unique'], self.connections
         self.indices = self.get_connections(self.connections, device)
 
+        """ CUDA backward optimization """
         if self.implementation == 'cuda':
             """
             Defining additional indices for improving the efficiency of the backward of the CUDA implementation.
@@ -69,8 +80,10 @@ class LogicLayer(torch.nn.Module):
                 [item for sublist in given_x_indices_of_y for item in sublist], dtype=torch.int64, device=device)
 
         self.num_neurons = out_dim
+        """each neuron equals to one logic gate"""
         self.num_weights = out_dim
 
+    """General forward pass function. Calls forward subfunctions """
     def forward(self, x):
         if isinstance(x, PackBitsTensor):
             assert not self.training, 'PackBitsTensor is not supported for the differentiable training mode.'
@@ -81,7 +94,12 @@ class LogicLayer(torch.nn.Module):
         else:
             if self.grad_factor != 1.:
                 x = GradFactor.apply(x, self.grad_factor)
+        """ 
+        Gradient scaling in case grad_factor!=1. GradFactor.apply internally calls forward(...), records 
+        the context (ctx) and ensures backward(...) has the grad_factor(=ctx)
+        """
 
+        """ Based on self.implementation, calls the right forward subfunction"""
         if self.implementation == 'cuda':
             if isinstance(x, PackBitsTensor):
                 return self.forward_cuda_eval(x)
@@ -93,15 +111,21 @@ class LogicLayer(torch.nn.Module):
 
     def forward_python(self, x):
         assert x.shape[-1] == self.in_dim, (x[0].shape[-1], self.in_dim)
+        """ Shape check """
 
         if self.indices[0].dtype == torch.int64 or self.indices[1].dtype == torch.int64:
             print(self.indices[0].dtype, self.indices[1].dtype)
             self.indices = self.indices[0].long(), self.indices[1].long()
             print(self.indices[0].dtype, self.indices[1].dtype)
+        """ Ensures right tensor indexing """
 
         a, b = x[..., self.indices[0]], x[..., self.indices[1]]
+
+        """ Training mode """
         if self.training:
             x = bin_op_s(a, b, torch.nn.functional.softmax(self.weights, dim=-1))
+            """ i_s is a tensor of shape (outdim)x(16) and each row has sum of 1"""
+            """ returns the expected value over all 16 gates (as one gate) """
         else:
             weights = torch.nn.functional.one_hot(self.weights.argmax(-1), 16).to(torch.float32)
             x = bin_op_s(a, b, weights)
@@ -114,6 +138,7 @@ class LogicLayer(torch.nn.Module):
 
         x = x.transpose(0, 1)
         x = x.contiguous()
+        """ Transpose for CUDA kernel because CUDA expects [features, batch]. """
 
         assert x.shape[0] == self.in_dim, (x.shape, self.in_dim)
 
@@ -147,6 +172,7 @@ class LogicLayer(torch.nn.Module):
         x.t = difflogic_cuda.eval(x.t, a, b, w)
 
         return x
+    """ CUDA Eval with PackBitsTensor. PyTorch does not build a computation graph, so no backward pass possible """
 
     def extra_repr(self):
         return '{}, {}, {}'.format(self.in_dim, self.out_dim, 'train' if self.training else 'eval')
@@ -167,11 +193,11 @@ class LogicLayer(torch.nn.Module):
             return get_unique_connections(self.in_dim, self.out_dim, device)
         else:
             raise ValueError(connections)
-
+    """ unique connections are the same for a nn with standard structure """
 
 ########################################################################################################################
 
-
+"""Used at output layer"""
 class GroupSum(torch.nn.Module):
     """
     The GroupSum module.
@@ -194,6 +220,8 @@ class GroupSum(torch.nn.Module):
 
         assert x.shape[-1] % self.k == 0, (x.shape, self.k)
         return x.reshape(*x.shape[:-1], self.k, x.shape[-1] // self.k).sum(-1) / self.tau
+    """example : x = [a,b,c,d,e,f], k=3
+            → [[a,b], [c,d], [e,f]] → sums → [a+b, c+d, e+f]"""
 
     def extra_repr(self):
         return 'k={}, tau={}'.format(self.k, self.tau)
@@ -201,7 +229,7 @@ class GroupSum(torch.nn.Module):
 
 ########################################################################################################################
 
-
+"""Custom autograd wrapper for CUDA kernels"""
 class LogicLayerCudaFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, a, b, w, given_x_indices_of_y_start, given_x_indices_of_y):
