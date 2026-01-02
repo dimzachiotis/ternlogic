@@ -7,7 +7,7 @@ class PackBitsTensor:
     def __init__(self, t: torch.BoolTensor, bit_count=32, device='cuda'):
 
         assert len(t.shape) == 2, t.shape
-        """ Ensures t is 2-dimensional boolean vector. If not, raises an assertion error and prints its shape"""
+        # Ensures t is 2-dimensional boolean vector. If not, raises an assertion error and prints its shape
 
         self.bit_count = bit_count
         self.device = device
@@ -15,27 +15,24 @@ class PackBitsTensor:
         if device == 'cuda':
             t = t.to(device).T.contiguous()
             self.t, self.pad_len = difflogic_cuda.tensor_packbits_cuda(t, self.bit_count)
-            """
-            The number of bits must be a multiple of 32.
-            If it isn’t, padding is added to reach the next multiple of 32.
-            """
+            #The number of bits must be a multiple of 32.
+            #If it isn’t, padding is added to reach the next multiple of 32.
+
         else:
             raise NotImplementedError(device)
-        """Only cuda tensors are supported"""
+        #Only cuda tensors are supported
 
-    """Unpacks bits, groups them in chunks of size k and computes (returns) grouped bit sums"""
+    #Unpacks bits, groups them in chunks of size k and computes (returns) grouped bit sums
     def group_sum(self, k):
         assert self.device == 'cuda', self.device
         return difflogic_cuda.groupbitsum(self.t, self.pad_len, k)
 
     def flatten(self, start_dim=0, end_dim=-1, **kwargs):
-        """
-        Returns the PackBitsTensor object itself.
-        Arguments are ignored.
-        """
+        #Returns the PackBitsTensor object itself.
+        #Arguments are ignored.
         return self
 
-    """ Helper for readable printing """
+    #Helper for readable printing 
     def _get_member_repr(self, member):
         if len(member) <= 4:
             result = [(np.binary_repr(integer, width=self.bit_count))[::-1] for integer in member]
@@ -46,7 +43,7 @@ class PackBitsTensor:
         return f"{' '.join(first_three)} {sep} {final}"
 
 
-    """ Controls how the object prints in the console. """
+    #Controls how the object prints in the console.
     def __repr__(self):
         return '\n'.join([self._get_member_repr(item) for item in self.t])
-    """  Iterates over rows in self.t, converts each row to a readable binary string, and joins rows with newlines."""
+    #Iterates over rows in self.t, converts each row to a readable binary string, and joins rows with newlines.
