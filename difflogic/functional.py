@@ -152,7 +152,8 @@ class GradFactor(torch.autograd.Function):
     def forward(ctx, x, f):
         ctx.f = f
         return x
-
+# ctx is a context object that can be used to stash information
+# for backward computation
     @staticmethod
     def backward(ctx, grad_y):
         return grad_y * ctx.f, None
