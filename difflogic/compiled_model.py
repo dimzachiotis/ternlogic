@@ -10,7 +10,7 @@ import numpy.typing
 import time
 from typing import Union
 
-
+#Logical Operations Encoding, each logic gate is encoded as an integer index. e.g. and->1
 ALL_OPERATIONS = [
     "zero",
     "and",
@@ -30,6 +30,7 @@ ALL_OPERATIONS = [
     "one",
 ]
 
+#Bit-Width Abstractions.This mapping ensures, correct C type, correct NumPy type, correct literal casting.
 BITS_TO_DTYPE = {8: "char", 16: "short", 32: "int", 64: "long long"}
 BITS_TO_ZERO_LITERAL = {8: "(char) 0",
                         16: "(short) 0", 32: "0", 64: "0LL"}
@@ -39,8 +40,10 @@ BITS_TO_C_DTYPE = {8: ctypes.c_int8, 16: ctypes.c_int16,
                    32: ctypes.c_int32, 64: ctypes.c_int64}
 BITS_TO_NP_DTYPE = {8: np.int8, 16: np.int16, 32: np.int32, 64: np.int64}
 
-
+#This class takes a trained PyTorch logic network, extracts the discrete logic gates,
+#generates equivalent C code, compiles it into a shared library and executes it efficiently.
 class CompiledLogicNet(torch.nn.Module):
+    #Construction function
     def __init__(
             self,
             model: torch.nn.Sequential,
@@ -51,22 +54,29 @@ class CompiledLogicNet(torch.nn.Module):
     ):
         super(CompiledLogicNet, self).__init__()
         self.model = model
+        #model=trained torch.nn.Sequential. self.model[0] is the first logilayer and ... self.model[-1] is a GroupSumlayer
         self.device = device
+        #device= cpu or cuda. cpu by default
         self.num_bits = num_bits
         self.cpu_compiler = cpu_compiler
+        # If verbose=True → prints internal steps 
+        # If verbose=False → silent     
 
         assert cpu_compiler in ["clang", "gcc"], cpu_compiler
         assert num_bits in [8, 16, 32, 64]
+        #Guarantees supported compilation.
 
         if self.model is not None:
             layers = []
 
             self.num_inputs = None
-
+            #Model Structure Validation. 
             assert isinstance(self.model[-1], GroupSum), 'The last layer of the model must be GroupSum, but it is {} / {}' \
                                                          ' instead.'.format(type(self.model[-1]), self.model[-1])
             self.num_classes = self.model[-1].k
+            #if self.model[-1] is a GroupSum object, then it has a variable k=number of intended real valued outputs, e.g., number of classes
 
+            #Extracting Logic Layers
             first = True
             for layer in self.model:
                 if isinstance(layer, LogicLayer):
@@ -75,6 +85,10 @@ class CompiledLogicNet(torch.nn.Module):
                         first = False
                     self.num_out_per_class = layer.out_dim // self.num_classes
                     layers.append((layer.indices[0], layer.indices[1], layer.weights.argmax(1)))
+                    #Each LogicLayer defines: indices[0]: index of input A, indices[1]: index of input B and
+                    #weights.argmax(1): chosen Boolean operation 
+                    # In LogicLayer, weights has shape:(num_neurons, 16). The argmax(1) means:
+                    # for each neuron, find the index (gate) of the largest weight across the 16 operations.                
                 elif isinstance(layer, torch.nn.Flatten):
                     if verbose:
                         print('Skipping torch.nn.Flatten layer ({}).'.format(type(layer)))
@@ -91,8 +105,10 @@ class CompiledLogicNet(torch.nn.Module):
 
         self.lib_fn = None
 
+    #Logic Gate Code Generation      
     def get_gate_code(self, var1, var2, gate_op):
         operation_name = ALL_OPERATIONS[gate_op]
+        #select wanted gate
 
         if operation_name == "zero":
             res = BITS_TO_ZERO_LITERAL[self.num_bits]
@@ -133,9 +149,11 @@ class CompiledLogicNet(torch.nn.Module):
             res = f"(char) ({res})"
         elif self.num_bits == 16:
             res = f"(short) ({res})"
-
+        #In C: Bitwise operators (~, &, |) promote operands to int. This can cause overflow or incorrect sign extension. 
+        #So last if elsif ensures correct bit-parallel Boolean semantics.                 
         return res
-
+    
+    #Layer Code Generation. This generates C code for one logic layer.   
     def get_layer_code(self, layer_a, layer_b, layer_op, layer_id, prefix_sums):
         code = []
         for var_id, (gate_a, gate_b, gate_op) in enumerate(zip(layer_a, layer_b, layer_op)):
@@ -154,8 +172,14 @@ class CompiledLogicNet(torch.nn.Module):
                 code.append(
                     f"\tconst {BITS_TO_DTYPE[self.num_bits]} v{prefix_sums[layer_id] + var_id} = {self.get_gate_code(a, b, gate_op)};"
                 )
+        #code is a list of C source code lines, each as a string.   
         return code
-
+    
+    #C Code Generation 
+    #Transforms the trained logic network into executable C code.It generates TWO functions:
+    #(A) logic_gate_net (This is the compiled neural network.) and (B) apply_logic_gate_net (This is the interface function).
+    #This is important because Python is slow for bit logic and C is fast. Moreover bitwise ops process 64 samples per instruction,
+    #so this is the core performance trick.   
     def get_c_code(self):
         prefix_sums = [0]
         cur_count = 0
@@ -237,7 +261,9 @@ void apply_logic_gate_net (bool const *inp, {BITS_TO_DTYPE[32]} *out, size_t len
 """)
 
         return "\n".join(code)
+    #Produces a valid C source file.   
 
+    #Compilation
     def compile(self, opt_level=1, save_lib_path=None, verbose=False):
         """
         Regarding the optimization level for C compiler:
@@ -318,6 +344,7 @@ void apply_logic_gate_net (bool const *inp, {BITS_TO_DTYPE[32]} *out, size_t len
 
         self.lib_fn = lib_fn
 
+    #Loading Compiled Model. Allows deployment without PyTorch and reuse of compiled binaries  
     @staticmethod
     def load(save_lib_path, num_classes, num_bits):
 
@@ -339,6 +366,9 @@ void apply_logic_gate_net (bool const *inp, {BITS_TO_DTYPE[32]} *out, size_t len
         self.lib_fn = lib_fn
         return self
 
+    #Forward Pass
+    #This is the forward pass of the compiled logic network, NOT PyTorch layers.
+    #After compilation, PyTorch is no longer used. The model is executed in C.
     def forward(
             self,
             x: Union[torch.BoolTensor, numpy.typing.NDArray[np.bool_]],
