@@ -1,4 +1,5 @@
 import codecs
+#used to convert raw bytes → hex → integers (needed for MNIST binary format).
 import os
 import os.path
 import warnings
@@ -9,20 +10,29 @@ import numpy as np
 import torch
 import torchvision
 from PIL import Image
+#convert raw arrays to images.
 from torchvision.datasets.utils import download_and_extract_archive, check_integrity
+#download_and_extract_archive: handles .gz files automatically. 
+#check_integrity: verifies file checksums (MD5).
 from torchvision.datasets.vision import VisionDataset
 
 
+#A callable transform. Removes MNIST padding, centers digit, output is 20×20 (classic MNIST “tight” digit)
 class MNISTRemoveBorderTransform:
+    # __call__ expects an image with values in [0, 1]. ToTensor() haaw to be applied previously,cause if not it will brake
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
         horizontal_black_lines = (image == 0.).all(dim=2)
+        #detects entire horizontal black rows. returns tensor with boolean values
         top_black = 0
         while horizontal_black_lines[0, top_black] and top_black < 14:
             top_black += 1
+        #Counts continuous black rows from the top
         bottom_black = 0
         while horizontal_black_lines[0, -bottom_black - 1] and bottom_black < 14:
             bottom_black += 1
+        #Counts continuous black rows from the bottom
         assert top_black + bottom_black >= 8, (top_black, bottom_black)
+        #Ensures there is enough border to remove.
         while top_black + bottom_black >= 10:
             if top_black > 0:
                 top_black -= 1
@@ -33,11 +43,14 @@ class MNISTRemoveBorderTransform:
                 top_black -= 1
             else:
                 bottom_black -= 1
+        #Enforce exactly 8 pixels removed vertically (Ensures final crop removes not too much)
         assert top_black + bottom_black == 8, (top_black, bottom_black)
         image = image[:, top_black:28 - bottom_black]
-
+        #Crop vertically
         vertical_black_lines = (image == 0.).all(dim=1)
+        #Detects entire black columns.
         left_black = 0
+        #same idea as rows
         while vertical_black_lines[0, left_black] and left_black < 14:
             left_black += 1
         right_black = 0
@@ -56,10 +69,10 @@ class MNISTRemoveBorderTransform:
                 right_black -= 1
         assert left_black + right_black == 8, (left_black, right_black)
         image = image[:, :, left_black:28 - right_black]
-
+        #Crop vertically
         return image
 
-
+#Custom reimplementation of torchvision’s MNIST with optional border removal.
 class MNIST(VisionDataset):
     """`MNIST <http://yann.lecun.com/exdb/mnist/>`_ Dataset.
 
@@ -81,7 +94,8 @@ class MNIST(VisionDataset):
         # 'http://yann.lecun.com/exdb/mnist/',
         'https://ossci-datasets.s3.amazonaws.com/mnist/',
     ]
-
+    #Where to download MNIST.
+    
     resources = [
         ("train-images-idx3-ubyte.gz", "f68b3c2dcbeaaa9fbdd348bbdeb94873"),
         ("train-labels-idx1-ubyte.gz", "d53e105ee54ea40749a09fcbcd1e9432"),
