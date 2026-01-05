@@ -1,27 +1,41 @@
+#This code .py file downloads UCI datasets, cleans raw text files, encodes features (mostly one-hot), 
+# splits train / val / test and produces PyTorch-ready datasets
+
 import torch
 import numpy as np
 from torch.utils.data import Dataset
+#Base class for custom datasets in PyTorch
+#Requires implementing __len__ and __getitem__
+
 from torchvision.datasets.utils import download_url, check_integrity
+#download_url: downloads files from the internet
+#check_integrity: checks file existence + MD5 checksum
+
 import os
 from sklearn.model_selection import train_test_split
-
+#Splits arrays into train / validation / test sets
 
 class UCIDataset(Dataset):
     def __init__(self, root, split='train', download=False):
         super(UCIDataset, self).__init__()
+        #root: directory where data is stored 
+        #split: 'train', 'val', or 'test'
+        #download: whether to download files if missing
         self.root = root
         self.split = split
 
+        #Download & Integrity Check
         if download and not self._check_integrity():
             self.downloads()
 
         if not self._check_integrity():
             raise RuntimeError('Dataset not found or corrupted.' +
                                ' You can use download=True to download it')
-
+    #Returns number of samples
     def __len__(self):
         return len(self.data)
 
+    #Verifies all files listed in file_list
     def _check_integrity(self):
         for file in self.file_list:
             md5 = file[1]
@@ -30,6 +44,7 @@ class UCIDataset(Dataset):
                 return False
         return True
 
+    #Downloads all dataset files
     def downloads(self):
         for file in self.file_list:
             md5 = file[1]
@@ -38,7 +53,7 @@ class UCIDataset(Dataset):
     def extra_repr(self):
         return "Split: {split}".format(**self.__dict__)
 
-
+#Inherits everything from UCIDataset
 class AdultDataset(UCIDataset):
     file_list = [
         ('https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data',
@@ -46,18 +61,23 @@ class AdultDataset(UCIDataset):
         ('https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test',
          '35238206dfdf7f1fe215bbb874adecdc'),
     ]
+    #Defines files required for this dataset
 
     def __init__(self, root, split='train', download=False, with_val=True):
+        #with_val: whether to create validation split
         super(AdultDataset, self).__init__(root, split, download)
-
+        #Checks download & integrity
         if self.split == 'val':
             assert with_val
+        #Cannot request validation split if with_val=False
 
         if self.split in ['train', 'val']:
             self.data, self.labels = AdultDataset.preprocess_adult_to_binary_data(os.path.join(root, 'adult.data'))
+            #Train / Validation data
             if with_val:
                 data_train, data_val, labels_train, labels_val \
                     = train_test_split(self.data, self.labels, test_size=0.1, random_state=0)
+                #Train / Validation split
                 if split == 'train':
                     self.data, self.labels = data_train, labels_train
                 elif split == 'val':
@@ -66,7 +86,9 @@ class AdultDataset(UCIDataset):
                     raise ValueError(split)
         else:
             self.data, self.labels = AdultDataset.preprocess_adult_to_binary_data(os.path.join(root, 'adult.test'))
+        #Test data
 
+    #Required by PyTorch DataLoader
     def __getitem__(self, index):
         data, label = self.data[index], self.labels[index]
 
@@ -101,6 +123,7 @@ class AdultDataset(UCIDataset):
             'hours-per-week': ['no-hours', 'mini-hours', 'half-hours', 'full-hours', 'more-hours', 'most-hours'],
         }
 
+        #Used for one-hot encoding
         discrete_attribute_options = [
             'Private', 'Self-emp-not-inc', 'Self-emp-inc', 'Federal-gov', 'Local-gov', 'State-gov', 'Without-pay',
             'Never-worked',
@@ -123,6 +146,7 @@ class AdultDataset(UCIDataset):
             *continuous_attributes['age'], *continuous_attributes['capital-gain'],
             *continuous_attributes['capital-loss'], *continuous_attributes['hours-per-week'],
         ]
+        #Used for one-hot encoding
 
         discrete_attribute_to_idx = {k: v for v, k in enumerate(discrete_attribute_options)}
 
@@ -131,13 +155,16 @@ class AdultDataset(UCIDataset):
             '<=50K': 0.0
         }
 
+        #Reading raw data
         def read_raw_data(filepath):
             with open(filepath, 'r') as f:
                 data = f.readlines()
+            #Reads all lines
 
             for i in range(len(data)):
                 if data[i].startswith('|') or len(data[i]) <= 2:
                     data[i] = None
+                #Skip comments and empty lines
                 else:
                     data[i] = data[i].strip('\n').strip('.').strip().split(',')
                     data[i] = [d.strip() for d in data[i]]
@@ -146,6 +173,7 @@ class AdultDataset(UCIDataset):
 
             return data
 
+        #Removes samples with missing data
         def discard_missing_data(data):
             num_samples = len(data)
             for i in range(num_samples):
@@ -158,6 +186,7 @@ class AdultDataset(UCIDataset):
         def convert_sample_to_feature_vector(sample):
             D = len(discrete_attribute_options)
             vec = np.zeros(D)
+            #one-hot vector
             for i, attr_type in enumerate(attributes):
                 if attr_type in ['education-num', 'fnlwgt']:
                     continue
@@ -210,7 +239,7 @@ class AdultDataset(UCIDataset):
                     vec_idx = discrete_attribute_to_idx[attr_value]
 
                 vec[vec_idx] = 1
-
+                #Activates correct category
             return vec
 
         def convert_data_to_feature_vectors(data):
@@ -233,7 +262,7 @@ class AdultDataset(UCIDataset):
 
         return feat, labels
 
-
+#Similar structure. Attributes are already discrete and it uses fixed one-hot ranges
 class MONKsDataset(UCIDataset):
     file_list = [
         ('https://archive.ics.uci.edu/ml/machine-learning-databases/monks-problems/monks-1.train',
@@ -249,7 +278,9 @@ class MONKsDataset(UCIDataset):
         ('https://archive.ics.uci.edu/ml/machine-learning-databases/monks-problems/monks-3.test',
          '46815731e31c07f89422cf60de8738e7'),
     ]
-
+    
+    #Style is an integer that selects which MONKs problem variant you want to load.The style parameter must be one of {1, 2, 3}, 
+    # and it directly controls which data file is read and which underlying rule generates the labels.
     def __init__(self, root, style: int, split='train', download=False, with_val=False):
         super(MONKsDataset, self).__init__(root, split, download)
         self.style = style
@@ -334,7 +365,7 @@ class MONKsDataset(UCIDataset):
 
         return feat, labels
 
-
+#Similar structure. Simple numeric features (4 floats). No one-hot encoding. 3-class classification.
 class IrisDataset(UCIDataset):
     file_list = [
         ('https://archive.ics.uci.edu/ml/machine-learning-databases/iris/iris.data',
@@ -423,7 +454,7 @@ class IrisDataset(UCIDataset):
 
         return feat, labels
 
-
+#Similar structure. All categorical. One-hot encoding across attributes. Binary labels/ classification (recurrence / no recurrence)
 class BreastCancerDataset(UCIDataset):
     file_list = [
         ('https://archive.ics.uci.edu/ml/machine-learning-databases/breast-cancer/breast-cancer.data',
@@ -540,14 +571,16 @@ class BreastCancerDataset(UCIDataset):
 
         return feat, labels
 
-
+#Main script - Example usage
 if __name__ == '__main__':
+    #AdultDataset loading 
     adult_train_set = AdultDataset('data-uci', split='train', download=True)
     adult_test_set = AdultDataset('data-uci', split='test')
     print('Adult')
     print(adult_train_set.data.shape)
     print(adult_train_set.labels.shape)
 
+    #MONKsDataset loading 
     monks1_train_set = MONKsDataset('data-uci', 1, split='train', download=True)
     monks1_test_set = MONKsDataset('data-uci', 1, split='test')
     monks2_train_set = MONKsDataset('data-uci', 2, split='train')
@@ -562,6 +595,7 @@ if __name__ == '__main__':
     print(monks2_test_set.data.shape)
     print(monks2_test_set.labels.shape)
 
+    #IrisDataset loading 
     iris_train_set = IrisDataset('data-uci', split='train', download=True)
     iris_test_set = IrisDataset('data-uci', split='test')
     print('\nIris')
@@ -570,6 +604,7 @@ if __name__ == '__main__':
     print(iris_test_set.data.shape)
     print(iris_test_set.labels.shape)
 
+    #BreastCancerDataset loading
     bc_train_set = BreastCancerDataset('data-uci', split='train', download=True)
     bc_test_set = BreastCancerDataset('data-uci', split='test')
     print('\nBreast Cancer')
