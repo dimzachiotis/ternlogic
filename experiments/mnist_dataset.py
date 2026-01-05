@@ -18,8 +18,9 @@ from torchvision.datasets.vision import VisionDataset
 
 
 #A callable transform. Removes MNIST padding, centers digit, output is 20×20 (classic MNIST “tight” digit)
+#This tranform only works on tensors and not on PIL images
 class MNISTRemoveBorderTransform:
-    # __call__ expects an image with values in [0, 1]. ToTensor() haaw to be applied previously,cause if not it will brake
+    # __call__ expects an image with values in [0, 1]. ToTensor() has to be applied previously,cause if not it will brake
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
         horizontal_black_lines = (image == 0.).all(dim=2)
         #detects entire horizontal black rows. returns tensor with boolean values
@@ -102,12 +103,14 @@ class MNIST(VisionDataset):
         ("t10k-images-idx3-ubyte.gz", "9fb629c4189551a2d022fa330f9573f3"),
         ("t10k-labels-idx1-ubyte.gz", "ec29112dd5afa0611ce80d1b7f02629c")
     ]
+    #It prevents partial download, network error and tampered file
 
     training_file = 'training.pt'
     test_file = 'test.pt'
     classes = ['0 - zero', '1 - one', '2 - two', '3 - three', '4 - four',
                '5 - five', '6 - six', '7 - seven', '8 - eight', '9 - nine']
-
+    
+    # @property lets you access a method like an attribute.
     @property
     def train_labels(self):
         warnings.warn("train_labels has been renamed targets")
@@ -127,7 +130,13 @@ class MNIST(VisionDataset):
     def test_data(self):
         warnings.warn("test_data has been renamed data")
         return self.data
+    
+    #Old PyTorch MNIST code used: dataset.train_labels and dataset.train_data
+    #New versions use: dataset.targets and dataset.data
+    #Same with test instead of train
+    #So these 4 functions exists (because of property, .train_labels ext. call the functions) so old code does not break.
 
+    #if remove_border=True, then it uses function of class MNISTRemoveBorderTransform.
     def __init__(
             self,
             root: str,
@@ -144,16 +153,21 @@ class MNIST(VisionDataset):
         if self._check_legacy_exist():
             self.data, self.targets = self._load_legacy_data()
             return
+        #Loads old .pt files if present. self.targets=labels, self.data=images
 
         if download:
             self.download()
+        #if true download dataset
 
         if not self._check_exists():
             raise RuntimeError('Dataset not found.' +
                                ' You can use download=True to download it')
+        #if no dataset found, fail 
 
         self.data, self.targets = self._load_data()
+        #Load raw IDX files
 
+        #Remove Borders if remove_border True or None, else default MNIST 
         if remove_border:
             if transform is None:
                 transform = torchvision.transforms.ToTensor()
@@ -166,6 +180,7 @@ class MNIST(VisionDataset):
             if transform is None:
                 self.transform = torchvision.transforms.ToTensor()
 
+    #This function checks if processed/ exists and also checks if .pt files are valid
     def _check_legacy_exist(self):
         processed_folder_exists = os.path.exists(self.processed_folder)
         if not processed_folder_exists:
@@ -180,6 +195,7 @@ class MNIST(VisionDataset):
         # directly.
         data_file = self.training_file if self.train else self.test_file
         return torch.load(os.path.join(self.processed_folder, data_file))
+    #returns training or test data based on self.train boolean value
 
     def _load_data(self):
         image_file = f"{'train' if self.train else 't10k'}-images-idx3-ubyte"
@@ -189,6 +205,7 @@ class MNIST(VisionDataset):
         targets = read_label_file(os.path.join(self.raw_folder, label_file))
 
         return data, targets
+    #Loads raw MNIST binary files.
 
     def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """
@@ -199,17 +216,21 @@ class MNIST(VisionDataset):
             tuple: (image, target) where target is index of the target class.
         """
         img, target = self.data[index], int(self.targets[index])
+        #Gets raw data.
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
         img = Image.fromarray(img.numpy(), mode='L')
+        #Converts img to PIL grayscale.
 
         if self.transform is not None:
             img = self.transform(img)
+        #applies border transform
 
         if self.target_transform is not None:
             target = self.target_transform(target)
-
+        #applies a target transform, you can create one
+        
         return img, target
 
     def __len__(self) -> int:
@@ -226,13 +247,16 @@ class MNIST(VisionDataset):
     @property
     def class_to_idx(self) -> Dict[str, int]:
         return {_class: i for i, _class in enumerate(self.classes)}
+    #returns a dictionary {'0 - zero': 0, '1 - one': 1, ...}
 
     def _check_exists(self) -> bool:
         return all(
             check_integrity(os.path.join(self.raw_folder, os.path.splitext(os.path.basename(url))[0]))
             for url, _ in self.resources
         )
+    #Checks that all raw MNIST files exist and all pass MD5 verification
 
+    #downloads and extracts .gz → raw binary files
     def download(self) -> None:
         """Download the MNIST data if it doesn't exist already."""
 
@@ -269,7 +293,7 @@ class MNIST(VisionDataset):
 
 def get_int(b: bytes) -> int:
     return int(codecs.encode(b, 'hex'), 16)
-
+#Converts raw bytes → integer.
 
 SN3_PASCALVINCENT_TYPEMAP = {
     8: (torch.uint8, np.uint8, np.uint8),
@@ -280,7 +304,7 @@ SN3_PASCALVINCENT_TYPEMAP = {
     14: (torch.float64, np.dtype('>f8'), 'f8')
 }
 
-
+#Reads the MNIST binary format and converts to Torch tensor
 def read_sn3_pascalvincent_tensor(path: str, strict: bool = True) -> torch.Tensor:
     """Read a SN3 file in "Pascal Vincent" format (Lush file 'libidx/idx-io.lsh').
        Argument may be a filename, compressed filename, or file object.
@@ -300,21 +324,21 @@ def read_sn3_pascalvincent_tensor(path: str, strict: bool = True) -> torch.Tenso
     assert parsed.shape[0] == np.prod(s) or not strict
     return torch.from_numpy(parsed.astype(m[2], copy=True)).view(*s)
 
-
+#Ensures 1D tensor and uint8 labels
 def read_label_file(path: str) -> torch.Tensor:
     x = read_sn3_pascalvincent_tensor(path, strict=False)
     assert (x.dtype == torch.uint8)
     assert (x.ndimension() == 1)
     return x.long()
 
-
+#Ensures 3D tensor and shape (N, 28, 28)
 def read_image_file(path: str) -> torch.Tensor:
     x = read_sn3_pascalvincent_tensor(path, strict=False)
     assert (x.dtype == torch.uint8)
     assert (x.ndimension() == 3)
     return x
 
-
+#Main script - Example usage
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
     import time
@@ -325,15 +349,18 @@ if __name__ == '__main__':
     #     torchvision.transforms.ToTensor(),
     #     MNISTRemoveBorderTransform(),
     # ]))
+
+    #Loads cropped MNIST.
     ds = MNIST('data-mnist', download=True, remove_border=True)
     loader = iter(torch.utils.data.DataLoader(ds, batch_size=1, shuffle=False))
+    #Loads one image at a time.
 
     fig, ax = plt.subplots(nrows=sqrt_of_n_imgs, ncols=sqrt_of_n_imgs)
     ax = ax.flatten()
     for idx in range(sqrt_of_n_imgs ** 2):
         image, _ = next(loader)
         ax[idx].imshow(image.squeeze(1).squeeze(0).numpy())
-
+        #Removes batch + channel dims.
     plt.show()
 
     print('Speed test...')
@@ -353,3 +380,7 @@ if __name__ == '__main__':
         pass
     t_e = time.time()
     print('remove_border', t_e - t_s)
+
+    #prints -> Speed test
+    #Measures overhead of border removal.
+    #Expected result : remove_border is slower, but improves downstream model performance
