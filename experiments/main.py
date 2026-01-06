@@ -1,3 +1,7 @@
+#This script loads tabular or image datasets, converts data into binary logic features, 
+#trains a differentiable logic gate network, evaluates in multiple modes and optionally 
+#compiles the trained model to optimized C code
+
 import argparse
 import math
 import random
@@ -9,11 +13,15 @@ import torchvision
 from tqdm import tqdm
 
 from results_json import ResultsJSON
+#Store experiment results in JSON files
 
+#Custom dataset loaders
 import mnist_dataset
 import uci_datasets
+#Custom logic-based neural network components
 from difflogic import LogicLayer, GroupSum, PackBitsTensor, CompiledLogicNet
 
+#Forces PyTorch to use one CPU thread
 torch.set_num_threads(1)
 
 BITS_TO_TORCH_FLOATING_POINT_TYPE = {
@@ -21,42 +29,59 @@ BITS_TO_TORCH_FLOATING_POINT_TYPE = {
     32: torch.float32,
     64: torch.float64
 }
+#Maps bit precision → PyTorch dtype. Used to train with different numerical precision
 
-
+#Dataset loading function.
+#Loads datasets and returns:train_loader, validation_loader and test_loader
 def load_dataset(args):
     validation_loader = None
+    #Default: no validation set unless explicitly created
+
+    #Adult dataset
     if args.dataset == 'adult':
         train_set = uci_datasets.AdultDataset('./data-uci', split='train', download=True, with_val=False)
         test_set = uci_datasets.AdultDataset('./data-uci', split='test', with_val=False)
         train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
+    #Breast cancer dataset
     elif args.dataset == 'breast_cancer':
         train_set = uci_datasets.BreastCancerDataset('./data-uci', split='train', download=True, with_val=False)
         test_set = uci_datasets.BreastCancerDataset('./data-uci', split='test', with_val=False)
         train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
+    #MONK datasets
     elif args.dataset.startswith('monk'):
         style = int(args.dataset[4])
         train_set = uci_datasets.MONKsDataset('./data-uci', style, split='train', download=True, with_val=False)
         test_set = uci_datasets.MONKsDataset('./data-uci', style, split='test', with_val=False)
         train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
+    #MNIST datasets
     elif args.dataset in ['mnist', 'mnist20x20']:
         train_set = mnist_dataset.MNIST('./data-mnist', train=True, download=True, remove_border=args.dataset == 'mnist20x20')
         test_set = mnist_dataset.MNIST('./data-mnist', train=False, remove_border=args.dataset == 'mnist20x20')
-
+        #removes border pixels if args.dataset == 'mnist20x20', else it keeps the origina 28x28
         train_set_size = math.ceil((1 - args.valid_set_size) * len(train_set))
+        #Computes training set size after validation split
         valid_set_size = len(train_set) - train_set_size
         train_set, validation_set = torch.utils.data.random_split(train_set, [train_set_size, valid_set_size])
+        #Randomly splits dataset
 
         train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, pin_memory=True, drop_last=True, num_workers=4)
         validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=args.batch_size, shuffle=False, pin_memory=True, drop_last=True)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=args.batch_size, shuffle=False, pin_memory=True, drop_last=True)
+        #Drops last incomplete batch, ensuring consistent batch size
+
+    #CIFAR-10 datasets
     elif 'cifar-10' in args.dataset:
         transform = {
             'cifar-10-3-thresholds': lambda x: torch.cat([(x > (i + 1) / 4).float() for i in range(3)], dim=0),
             'cifar-10-31-thresholds': lambda x: torch.cat([(x > (i + 1) / 32).float() for i in range(31)], dim=0),
         }[args.dataset]
+        #if args.dataset=cifar-10-3-thresholds, creates 3 binary masks: x > 0.25, x > 0.50, x > 0.75 so one float pixel becomes a tensor of 3 binary values -> shape change
+        # original: 3 × 32 × 32, after: (3×3) × 32 × 32 = 9 × 32 × 32
+        #if args.dataset=cifar-10-31-thresholds, Same idea but 31 masks, much higher dimensional input
+
         transforms = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Lambda(transform),
@@ -77,7 +102,7 @@ def load_dataset(args):
 
     return train_loader, validation_loader, test_loader
 
-
+#Yields exactly n batches even if dataset is smaller (Recycles data loader if needed)
 def load_n(loader, n):
     i = 0
     while i < n:
@@ -87,7 +112,7 @@ def load_n(loader, n):
             if i == n:
                 break
 
-
+#Returns input feature size (flattened tensor)
 def input_dim_of_dataset(dataset):
     return {
         'adult': 116,
@@ -101,7 +126,7 @@ def input_dim_of_dataset(dataset):
         'cifar-10-31-thresholds': 3 * 32 * 32 * 31,
     }[dataset]
 
-
+#Returns number of output classes
 def num_classes_of_dataset(dataset):
     return {
         'adult': 2,
@@ -115,31 +140,42 @@ def num_classes_of_dataset(dataset):
         'cifar-10-31-thresholds': 10,
     }[dataset]
 
-
+#Model creation. Builds model, loss function, optimizer.
 def get_model(args):
     llkw = dict(grad_factor=args.grad_factor, connections=args.connections)
+    #Common keyword arguments for logic layers
 
     in_dim = input_dim_of_dataset(args.dataset)
     class_count = num_classes_of_dataset(args.dataset)
+    #Determines input/output sizes
 
     logic_layers = []
+    #Stores layers before final classifier
 
     arch = args.architecture
     k = args.num_neurons
+    #number of neurons/gates per layer
     l = args.num_layers
+    #Model hyperparameters
 
     ####################################################################################################################
 
     if arch == 'randomly_connected':
         logic_layers.append(torch.nn.Flatten())
+        #Flattens input and appends it to list
         logic_layers.append(LogicLayer(in_dim=in_dim, out_dim=k, **llkw))
+        #First logic layer
+
+        #Adds hidden layers
         for _ in range(l - 1):
             logic_layers.append(LogicLayer(in_dim=k, out_dim=k, **llkw))
 
+        #Wraps layers into a single model
         model = torch.nn.Sequential(
             *logic_layers,
             GroupSum(class_count, args.tau)
         )
+        #GroupSum is the output layer with class_count classes and t=args.tau
 
     ####################################################################################################################
 
@@ -147,9 +183,10 @@ def get_model(args):
         raise NotImplementedError(arch)
 
     ####################################################################################################################
-
+    #Counts logic neurons (excluding Flatten & GroupSum)
     total_num_neurons = sum(map(lambda x: x.num_neurons, logic_layers[1:-1]))
     print(f'total_num_neurons={total_num_neurons}')
+    #Counts logic connections
     total_num_weights = sum(map(lambda x: x.num_weights, logic_layers[1:-1]))
     print(f'total_num_weights={total_num_weights}')
     if args.experiment_id is not None:
@@ -159,39 +196,49 @@ def get_model(args):
         })
 
     model = model.to('cuda')
+    #Moves model to GPU
 
     print(model)
     if args.experiment_id is not None:
         results.store_results({'model_str': str(model)})
 
     loss_fn = torch.nn.CrossEntropyLoss()
+    #Cross entropy Loss function
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
+    #Adam optimizer
 
     return model, loss_fn, optimizer
 
-
+#Training Function
 def train(model, x, y, loss_fn, optimizer):
     x = model(x)
+    #Forward pass
     loss = loss_fn(x, y)
+    #Compute loss
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
+    #Backpropagation and parameter update
 
     return loss.item()
-
+    #returns a scalar
 
 def eval(model, loader, mode):
     orig_mode = model.training
+    #Stores original train/eval mode
     with torch.no_grad():
         model.train(mode=mode)
+        #Allows evaluating in training mode or eval mode
         res = np.mean(
             [
                 (model(x.to('cuda').round()).argmax(-1) == y.to('cuda')).to(torch.float32).mean().item()
                 for x, y in loader
             ]
         )
+        #Mean accuracy across batches
         model.train(mode=orig_mode)
+        #Restores original mode
     return res.item()
 
 
@@ -209,7 +256,13 @@ def packbits_eval(model, loader):
         model.train(mode=orig_mode)
     return res.item()
 
-
+#Main script - Example usage
+#IMPORTANT
+#When Python starts executing a file, it automatically creates several special variables, including:
+#__name__, __file__,__package__, __loader__ .
+#Python assigns __name__ before any line of your code runs.
+#if you run the file directly python main.py
+#Python sets: __name__ = "__main__"
 if __name__ == '__main__':
 
     ####################################################################################################################
@@ -253,7 +306,7 @@ if __name__ == '__main__':
     parser.add_argument('--grad-factor', type=float, default=1.)
 
     args = parser.parse_args()
-
+    #creates arg object
     ####################################################################################################################
 
     print(vars(args))
@@ -265,19 +318,20 @@ if __name__ == '__main__':
     if args.experiment_id is not None:
         assert 520_000 <= args.experiment_id < 530_000, args.experiment_id
         results = ResultsJSON(eid=args.experiment_id, path='./results/')
+        #Creates experiment log file
         results.store_args(args)
 
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
-
+    #keeping same seed number, it ensures reproducibility
     train_loader, validation_loader, test_loader = load_dataset(args)
     model, loss_fn, optim = get_model(args)
-
+    #Load data & model
     ####################################################################################################################
 
     best_acc = 0
-
+    #Iterates exactly num_iterations batches
     for i, (x, y) in tqdm(
             enumerate(load_n(train_loader, args.num_iterations)),
             desc='iteration',
@@ -285,9 +339,12 @@ if __name__ == '__main__':
     ):
         x = x.to(BITS_TO_TORCH_FLOATING_POINT_TYPE[args.training_bit_count]).to('cuda')
         y = y.to('cuda')
+        #Moves data to GPU
 
         loss = train(model, x, y, loss_fn, optim)
+        #Performs one optimization step
 
+        #Evaluates: Train accuracy, Validation accuracy (optional), Test accuracy. Both train mode and eval mode
         if (i+1) % args.eval_freq == 0:
             if args.extensive_eval:
                 train_accuracy_train_mode = eval(model, train_loader, mode=True)
@@ -320,17 +377,20 @@ if __name__ == '__main__':
             else:
                 print(r)
 
+            #Tracks best validation performance
             if valid_accuracy_eval_mode > best_acc:
                 best_acc = valid_accuracy_eval_mode
+                #Saves best model statistics
                 if args.experiment_id is not None:
                     results.store_final_results(r)
                 else:
                     print('IS THE BEST UNTIL NOW.')
-
+            #Writes JSON file to disk
             if args.experiment_id is not None:
                 results.save()
 
     ####################################################################################################################
+    #Model Compilation (Optional)
 
     if args.compile_model:
         print('\n' + '='*80)
@@ -349,7 +409,7 @@ if __name__ == '__main__':
                 save_lib_path = 'lib/{:08d}_{}.so'.format(
                     args.experiment_id if args.experiment_id is not None else 0, num_bits
                 )
-
+                #Converts logic network into pure C code
                 compiled_model = CompiledLogicNet(
                     model=model,
                     num_bits=num_bits,
@@ -368,12 +428,12 @@ if __name__ == '__main__':
                 with torch.no_grad():
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
                         data = torch.nn.Flatten()(data).bool().numpy()
-
+                        #Executes compiled C model
                         output = compiled_model(data, verbose=True)
 
                         correct += (output.argmax(-1) == labels).float().sum()
                         total += output.shape[0]
-
+                #Accuracy of compiled model
                 acc3 = correct / total
                 print('COMPILED MODEL', num_bits, acc3)
 
