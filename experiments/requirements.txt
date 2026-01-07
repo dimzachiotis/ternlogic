@@ -2,4 +2,5 @@ tqdm
 scikit-learn
 torch
 torchvision
-difflogic
+#difflogic
+#we have the file difflogic available
