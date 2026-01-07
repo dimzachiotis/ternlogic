@@ -1,7 +1,7 @@
 #This .py file implements a fully configurable PyTorch training pipeline that:
 #loads multiple datasets, builds a fully connected neural network, trains it on GPU,
 #evaluates performance periodically,and logs all results reproducibly.
-#ONLY CUDA 
+#both cuda and cpu
 import argparse
 import math
 import random
@@ -15,6 +15,9 @@ from results_json import ResultsJSON
 
 import mnist_dataset
 import uci_datasets
+
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#if no cuda available, then use cpu
 
 torch.set_num_threads(1)
 #Limits PyTorch to 1 CPU thread
@@ -199,8 +202,8 @@ def get_model(args):
             'total_num_weights': total_num_weights,
         })
 
-    model = model.to('cuda')
-    #Moves model to GPU
+    model = model.to(device)
+    #Moves model to device
 
     print(model)
     if args.experiment_id is not None:
@@ -237,8 +240,8 @@ def eval(model, loader, mode):
         res = np.mean(
             [
                 (model(
-                    x.to(BITS_TO_TORCH_FLOATING_POINT_TYPE[args.training_bit_count]).to('cuda')
-                ).argmax(-1) == y.to('cuda')
+                    x.to(BITS_TO_TORCH_FLOATING_POINT_TYPE[args.training_bit_count]).to(device)
+                ).argmax(-1) == y.to(device)
                 ).to(torch.float32).mean().item()
                 for x, y in loader
             ]
@@ -316,9 +319,9 @@ if __name__ == '__main__':
             desc='iteration',
             total=args.num_iterations,
     ):
-        x = x.to(BITS_TO_TORCH_FLOATING_POINT_TYPE[args.training_bit_count]).to('cuda')
-        y = y.to('cuda')
-        #Moves data to GPU
+        x = x.to(BITS_TO_TORCH_FLOATING_POINT_TYPE[args.training_bit_count]).to(device)
+        y = y.to(device)
+        #Moves data to device
 
         loss = train(model, x, y, loss_fn, optim)
         #Performs one optimization step
