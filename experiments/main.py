@@ -21,6 +21,9 @@ import uci_datasets
 #Custom logic-based neural network components
 from difflogic import LogicLayer, GroupSum, PackBitsTensor, CompiledLogicNet
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+#if no cuda available, then use cpu
+
 #Forces PyTorch to use one CPU thread
 torch.set_num_threads(1)
 
@@ -195,8 +198,8 @@ def get_model(args):
             'total_num_weights': total_num_weights,
         })
 
-    model = model.to('cuda')
-    #Moves model to GPU
+    model = model.to(device)
+    #Moves model to device
 
     print(model)
     if args.experiment_id is not None:
@@ -232,7 +235,7 @@ def eval(model, loader, mode):
         #Allows evaluating in training mode or eval mode
         res = np.mean(
             [
-                (model(x.to('cuda').round()).argmax(-1) == y.to('cuda')).to(torch.float32).mean().item()
+                (model(x.to(device).round()).argmax(-1) == y.to(device)).to(torch.float32).mean().item()
                 for x, y in loader
             ]
         )
@@ -248,8 +251,8 @@ def packbits_eval(model, loader):
         model.eval()
         res = np.mean(
             [
-                (model(PackBitsTensor(x.to('cuda').reshape(x.shape[0], -1).round().bool())).argmax(-1) == y.to(
-                    'cuda')).to(torch.float32).mean().item()
+                (model(PackBitsTensor(x.to(device).reshape(x.shape[0], -1).round().bool())).argmax(-1) == y.to(
+                    device)).to(torch.float32).mean().item()
                 for x, y in loader
             ]
         )
@@ -337,9 +340,9 @@ if __name__ == '__main__':
             desc='iteration',
             total=args.num_iterations,
     ):
-        x = x.to(BITS_TO_TORCH_FLOATING_POINT_TYPE[args.training_bit_count]).to('cuda')
-        y = y.to('cuda')
-        #Moves data to GPU
+        x = x.to(BITS_TO_TORCH_FLOATING_POINT_TYPE[args.training_bit_count]).to(device)
+        y = y.to(device)
+        #Moves data to device
 
         loss = train(model, x, y, loss_fn, optim)
         #Performs one optimization step
