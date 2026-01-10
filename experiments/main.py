@@ -6,7 +6,7 @@ import argparse
 import math
 import random
 import os
-
+import sys
 import numpy as np
 import torch
 import torchvision
@@ -19,9 +19,17 @@ from results_json import ResultsJSON
 import mnist_dataset
 import uci_datasets
 #Custom logic-based neural network components
-from difflogic import LogicLayer, GroupSum, PackBitsTensor, CompiledLogicNet
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+top_level_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if top_level_dir not in sys.path:
+    sys.path.insert(0, top_level_dir)
+#it doesnt see difflogic.py file, so this fixes it
+
+from difflogic.difflogic import LogicLayer, GroupSum
+from difflogic.packbitstensor import PackBitsTensor
+from difflogic.compiled_model import CompiledLogicNet
+
+device ='cpu' if  not torch.cuda.is_available() else 'cuda'
 #if no cuda available, then use cpu
 
 #Forces PyTorch to use one CPU thread
