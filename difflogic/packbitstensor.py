@@ -1,4 +1,6 @@
-import difflogic_cuda
+#This file, is only used when cuda --implementation
+
+#import difflogic_cuda
 import torch
 import numpy as np
 
