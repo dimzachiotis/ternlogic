@@ -2,8 +2,7 @@ import torch
 import numpy as np
 
 BITS_TO_NP_DTYPE = {8: np.int8, 16: np.int16, 32: np.int32, 64: np.int64}
-
-
+number_of_gates=9
 # | id | Operator             | AB=00 | AB=00.5 | AB=01 | AB=0.50 | AB=0.50.5 | AB=0.51 | AB=10 | AB=10.5 | AB=11 |
 # |----|----------------------|-------|---------|-------|---------|-----------|---------|-------|---------|-------|
 # | 0  | 0                    | 0     | 0       | 0     | 0       | 0         | 0       | 0     | 0       | 0     |
@@ -53,7 +52,7 @@ def bin_op(a, b, i):
 
 def bin_op_s(a, b, i_s):
     r = torch.zeros_like(a)
-    for i in range(16):
+    for i in range(number_of_gates):
         u = bin_op(a, b, i)
         r = r + i_s[..., i] * u
     return r
