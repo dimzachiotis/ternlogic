@@ -46,14 +46,6 @@ def bin_op(a, b, i):
     elif i == 7:
         return 1 - b
     elif i == 8:
-        return -2*(a * a) + 2*a + 0.5
-    elif i == 9:
-        return -2*(b * b) + 2*b + 0.5
-    elif i == 10:
-        return 3*(a * a) -3.5*a + 1
-    elif i == 11:
-        return 3*(b * b) -3.5*b + 1
-    elif i == 12:
         return torch.ones_like(a)
 
 #Implements the relaxation form of each ternary logic gate
