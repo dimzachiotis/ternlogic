@@ -7,7 +7,7 @@ from .packbitstensor import PackBitsTensor
 
 
 ########################################################################################################################
-
+number_of_gates=9
 
 class LogicLayer(torch.nn.Module):
     #The core module for differentiable logic gate networks. Provides a differentiable logic gate layer.
@@ -30,8 +30,8 @@ class LogicLayer(torch.nn.Module):
         :param connections: method for initializing the connectivity of the logic gate net
         """
         super().__init__()
-        self.weights = torch.nn.parameter.Parameter(torch.randn(out_dim, 16, device=device))
-        #  creates a matrix of shape (out-dim)x(16) with random variables that follow the N(0,1). Then it marks it as trainable 
+        self.weights = torch.nn.parameter.Parameter(torch.randn(out_dim, number_of_gates, device=device))
+        #  creates a matrix of shape (out-dim)x(number_of_gates) with random variables that follow the N(0,1). Then it marks it as trainable 
         #  and registers it with the module, so it can be trained through collable python ready functions. Without Parameter the 
         #  tensor would be treated as a constant.
         
@@ -117,10 +117,11 @@ class LogicLayer(torch.nn.Module):
         #Training mode 
         if self.training:
             x = bin_op_s(a, b, torch.nn.functional.softmax(self.weights, dim=-1))
-            # i_s is a tensor of shape (outdim)x(16) and each row has sum of 1
-            #returns the expected value over all 16 gates (as one gate)
+            # i_s is a tensor of shape (outdim)x(number_of_gates) and each row has sum of 1. converts weights into probabilities
+            #returns the expected value over all number_of_gates gates (as one gate)
         else:
-            weights = torch.nn.functional.one_hot(self.weights.argmax(-1), 16).to(torch.float32)
+            #Evaluation Mode , hard logic gates (select one gate over the number_of_gates)
+            weights = torch.nn.functional.one_hot(self.weights.argmax(-1), number_of_gates).to(torch.float32)
             x = bin_op_s(a, b, weights)
         return x
 
@@ -143,7 +144,7 @@ class LogicLayer(torch.nn.Module):
                 x, a, b, w, self.given_x_indices_of_y_start, self.given_x_indices_of_y
             ).transpose(0, 1)
         else:
-            w = torch.nn.functional.one_hot(self.weights.argmax(-1), 16).to(x.dtype)
+            w = torch.nn.functional.one_hot(self.weights.argmax(-1), number_of_gates).to(x.dtype)
             with torch.no_grad():
                 return LogicLayerCudaFunction.apply(
                     x, a, b, w, self.given_x_indices_of_y_start, self.given_x_indices_of_y
@@ -170,7 +171,7 @@ class LogicLayer(torch.nn.Module):
     def extra_repr(self):
         return '{}, {}, {}'.format(self.in_dim, self.out_dim, 'train' if self.training else 'eval')
 
-    def get_connections(self, connections, device='cuda'):
+    def get_connections(self, connections, device='cpu'):
         assert self.out_dim * 2 >= self.in_dim, 'The number of neurons ({}) must not be smaller than half of the ' \
                                                 'number of inputs ({}) because otherwise not all inputs could be ' \
                                                 'used or considered.'.format(self.out_dim, self.in_dim)
@@ -186,6 +187,7 @@ class LogicLayer(torch.nn.Module):
             return get_unique_connections(self.in_dim, self.out_dim, device)
         else:
             raise ValueError(connections)
+    #In case you want cpu, you have to initialize it device='cpu' else 'cuda'
     #unique connections are the same for a nn with standard structure
 
 ########################################################################################################################
