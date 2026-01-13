@@ -72,7 +72,7 @@ class AdultDataset(UCIDataset):
         #Cannot request validation split if with_val=False
 
         if self.split in ['train', 'val']:
-            self.data, self.labels = AdultDataset.preprocess_adult_to_binary_data(os.path.join(root, 'adult.data'))
+            self.data, self.labels = AdultDataset.preprocess_adult_to_ternary_data(os.path.join(root, 'adult.data'))
             #Train / Validation data
             if with_val:
                 data_train, data_val, labels_train, labels_val \
@@ -85,7 +85,7 @@ class AdultDataset(UCIDataset):
                 else:
                     raise ValueError(split)
         else:
-            self.data, self.labels = AdultDataset.preprocess_adult_to_binary_data(os.path.join(root, 'adult.test'))
+            self.data, self.labels = AdultDataset.preprocess_adult_to_ternary_data(os.path.join(root, 'adult.test'))
         #Test data
 
     #Required by PyTorch DataLoader
@@ -95,7 +95,7 @@ class AdultDataset(UCIDataset):
         return data, label
 
     @staticmethod
-    def preprocess_adult_to_binary_data(data_file_name):
+    def preprocess_adult_to_ternary_data(data_file_name):
 
         attributes = [
             'age',
@@ -240,6 +240,7 @@ class AdultDataset(UCIDataset):
 
                 vec[vec_idx] = 1
                 #Activates correct category
+
             return vec
 
         def convert_data_to_feature_vectors(data):
@@ -290,7 +291,7 @@ class MONKsDataset(UCIDataset):
             assert with_val
 
         if self.split in ['train', 'val']:
-            self.data, self.labels = MONKsDataset.preprocess_monks_to_binary_data(
+            self.data, self.labels = MONKsDataset.preprocess_monks_to_ternary_data(
                 os.path.join(root, 'monks-{}.train'.format(style))
             )
             if with_val:
@@ -303,7 +304,7 @@ class MONKsDataset(UCIDataset):
                 else:
                     raise ValueError(split)
         else:
-            self.data, self.labels = MONKsDataset.preprocess_monks_to_binary_data(
+            self.data, self.labels = MONKsDataset.preprocess_monks_to_ternary_data(
                 os.path.join(root, 'monks-{}.test'.format(style))
             )
 
@@ -313,7 +314,7 @@ class MONKsDataset(UCIDataset):
         return data, label
 
     @staticmethod
-    def preprocess_monks_to_binary_data(data_file_name):
+    def preprocess_monks_to_ternary_data(data_file_name):
 
         def read_raw_data(filepath):
             with open(filepath, 'r') as f:
