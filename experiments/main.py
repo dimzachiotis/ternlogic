@@ -399,6 +399,28 @@ if __name__ == '__main__':
             #Writes JSON file to disk
             if args.experiment_id is not None:
                 results.save()
+####################################################################################################################
+    #Store Weights
+    import json
+
+    if args.experiment_id is not None:
+    # Ensure results folder exists
+        os.makedirs('./results', exist_ok=True)
+
+        layer_weights = []
+        for i, layer in enumerate(model):
+            if isinstance(layer, LogicLayer):
+                # Access the neuron weights (or connections, depending on your LogicLayer implementation)
+                weights = layer.weights.detach().cpu()
+                layer_weights.append(weights)
+                print(f"Layer {i}: weights shape={weights.shape}, mean={weights.mean():.4f}, std={weights.std():.4f}")
+
+        # Save as JSON file (human-readable, can open in any text editor)
+        json_filename = f"./results/trained_weights_{args.experiment_id}.json"
+        weights_json = {f"layer_{i}": w.tolist() for i, w in enumerate(layer_weights)}
+        with open(json_filename, "w") as f:
+            json.dump(weights_json, f)
+        print(f"Neuron weights saved as JSON: {json_filename}")
 
     ####################################################################################################################
     #Model Compilation (Optional)
