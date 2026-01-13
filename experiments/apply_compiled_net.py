@@ -15,11 +15,11 @@ batch_size = 1_000
 
 transforms = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
-    torchvision.transforms.Lambda(lambda x: x.round()),
+    torchvision.transforms.Lambda(lambda x: torch.round(x*2)/2),
 ])
 #Creates a pipeline of image transformations. 
 # Converts a PIL image or NumPy array into a PyTorch tensor and also scales pixel values from [0, 255] → [0.0, 1.0].
-#Applies x.round() to the tensor.This binarizes the image, rounds every pixel to either 0.0 or 1.0 
+#Applies x.round() to the tensor.This binarizes the image, rounds every pixel to either 0.0, 0.5 or 1.0 
 #This is important because Logic networks operate on Boolean inputs, not real numbers
 
 #creates test set
