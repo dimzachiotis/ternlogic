@@ -11,6 +11,7 @@ import numpy as np
 import torch
 import torchvision
 from tqdm import tqdm
+import json
 
 from results_json import ResultsJSON
 #Store experiment results in JSON files
@@ -400,29 +401,7 @@ if __name__ == '__main__':
             #Writes JSON file to disk
             if args.experiment_id is not None:
                 results.save()
-####################################################################################################################
-    #Store Weights
-    import json
-
-    if args.experiment_id is not None:
-    # Ensure results folder exists
-        os.makedirs('./results', exist_ok=True)
-
-        layer_weights = []
-        for i, layer in enumerate(model):
-            if isinstance(layer, LogicLayer):
-                # Access the neuron weights (or connections, depending on your LogicLayer implementation)
-                weights = layer.weights.detach().cpu()
-                layer_weights.append(weights)
-                print(f"Layer {i}: weights shape={weights.shape}, mean={weights.mean():.4f}, std={weights.std():.4f}")
-
-        # Save as JSON file (human-readable, can open in any text editor)
-        json_filename = f"./results/trained_weights_{args.experiment_id}.json"
-        weights_json = {f"layer_{i}": w.tolist() for i, w in enumerate(layer_weights)}
-        with open(json_filename, "w") as f:
-            json.dump(weights_json, f)
-        print(f"Neuron weights saved as JSON: {json_filename}")
-
+    
     ####################################################################################################################
 
     #Model Python Compilation (Optional)
@@ -433,7 +412,8 @@ if __name__ == '__main__':
         
         #Creates a CompiledPython object
         compiled_model = CompiledPython(
-            model=model
+            model=model,
+            verbose=False
         )
 
         correct, total = 0, 0
@@ -442,13 +422,13 @@ if __name__ == '__main__':
                 #flattens the input tensor to 1D per sample and converts the data to boolean values (0 or 1). shape[batch size,product of dimesions of data]
                 data = torch.nn.Flatten()(data).bool()
                 #Returns predictions as outputs shape[batch size,number of classes]
-                output = compiled_model.predict(data)
+                output = compiled_model.forward(data)
 
                 correct += (output.argmax(-1) == labels).float().sum()
                 total += output.shape[0]
         #Accuracy of compiled model
-        acc3 = correct / total
-        print('COMPILED PYTHON MODEL', acc3)
+        python_acc = correct / total
+        print('COMPILED PYTHON MODEL', python_acc)
 
     #Store Accuracy of python compilation
     if args.experiment_id is not None:
@@ -458,18 +438,18 @@ if __name__ == '__main__':
         # Prepare filename
         json_filename = f"./results/{args.experiment_id}_python.json"
 
-        # If acc3 is a tensor, convert it to float
-        if isinstance(acc3, torch.Tensor):
-            acc3 = acc3.item()  # gets the scalar value as a float
+        # If python_acc is a tensor, convert it to float
+        if isinstance(python_acc, torch.Tensor):
+            python_acc = python_acc.item()  # gets the scalar value as a float
 
         # Wrap in dict for JSON
-        acc_data = {'accuracy': acc3}
+        acc_data = {'accuracy': python_acc}
 
         # Save to JSON
         with open(json_filename, "w") as f:
             json.dump(acc_data, f, indent=4)
 
-        print(f"Accuracy saved as JSON: {json_filename}") 
+        print(f"python_acc saved as JSON: {json_filename}") 
 
     ####################################################################################################################
 
@@ -513,13 +493,13 @@ if __name__ == '__main__':
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
                         data = torch.nn.Flatten()(data).bool().numpy()
                         #Executes compiled C model
-                        output = compiled_model(data, verbose=True)
+                        output = compiled_model(data, verbose=False)
 
                         correct += (output.argmax(-1) == labels).float().sum()
                         total += output.shape[0]
                 #Accuracy of compiled model
-                acc3 = correct / total
-                print('COMPILED C MODEL', num_bits, acc3)
+                c_acc = correct / total
+                print('COMPILED C MODEL', num_bits, c_acc)
     #Store Accuracy of c compilation
     if args.experiment_id is not None:
         # Ensure results folder exists
@@ -528,15 +508,15 @@ if __name__ == '__main__':
         # Prepare filename
         json_filename = f"./results/{args.experiment_id}_c.json"
 
-        # If acc3 is a tensor, convert it to float
-        if isinstance(acc3, torch.Tensor):
-            acc3 = acc3.item()  # gets the scalar value as a float
+        # If c_acc is a tensor, convert it to float
+        if isinstance(c_acc, torch.Tensor):
+            c_acc = c_acc.item()  # gets the scalar value as a float
 
         # Wrap in dict for JSON
-        acc_data = {'accuracy': acc3}
+        acc_data = {'accuracy': c_acc}
 
         # Save to JSON
         with open(json_filename, "w") as f:
             json.dump(acc_data, f, indent=4)
 
-        print(f"Accuracy saved as JSON: {json_filename}") 
+        print(f"c_acc saved as JSON: {json_filename}") 
