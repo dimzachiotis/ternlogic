@@ -28,6 +28,7 @@ if top_level_dir not in sys.path:
 from difflogic.difflogic import LogicLayer, GroupSum
 from difflogic.packbitstensor import PackBitsTensor
 from difflogic.compiled_model import CompiledLogicNet
+from difflogic.compiled_model_python import CompiledPython
 
 device ='cpu' if  not torch.cuda.is_available() else 'cuda'
 #if no cuda available, then use cpu
@@ -423,8 +424,56 @@ if __name__ == '__main__':
         print(f"Neuron weights saved as JSON: {json_filename}")
 
     ####################################################################################################################
-    #Model Compilation (Optional)
 
+    #Model Python Compilation (Optional)
+    if args.compile_model:
+        print('\n' + '='*80)
+        print(' Compiling model with Python...')
+        print('='*80)
+        
+        #Creates a CompiledPython object
+        compiled_model = CompiledPython(
+            model=model
+        )
+
+        correct, total = 0, 0
+        with torch.no_grad():
+            for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
+                #flattens the input tensor to 1D per sample and converts the data to boolean values (0 or 1). shape[batch size,product of dimesions of data]
+                data = torch.nn.Flatten()(data).bool()
+                #Returns predictions as outputs shape[batch size,number of classes]
+                output = compiled_model.predict(data)
+
+                correct += (output.argmax(-1) == labels).float().sum()
+                total += output.shape[0]
+        #Accuracy of compiled model
+        acc3 = correct / total
+        print('COMPILED PYTHON MODEL', acc3)
+
+    #Store Accuracy of python compilation
+    if args.experiment_id is not None:
+        # Ensure results folder exists
+        os.makedirs('./results', exist_ok=True)
+
+        # Prepare filename
+        json_filename = f"./results/{args.experiment_id}_python.json"
+
+        # If acc3 is a tensor, convert it to float
+        if isinstance(acc3, torch.Tensor):
+            acc3 = acc3.item()  # gets the scalar value as a float
+
+        # Wrap in dict for JSON
+        acc_data = {'accuracy': acc3}
+
+        # Save to JSON
+        with open(json_filename, "w") as f:
+            json.dump(acc_data, f, indent=4)
+
+        print(f"Accuracy saved as JSON: {json_filename}") 
+
+    ####################################################################################################################
+
+    #Model C Compilation (Optional)
     if args.compile_model:
         print('\n' + '='*80)
         print(' Converting the model to C code and compiling it...')
@@ -470,7 +519,7 @@ if __name__ == '__main__':
                         total += output.shape[0]
                 #Accuracy of compiled model
                 acc3 = correct / total
-                print('COMPILED MODEL', num_bits, acc3)
+                print('COMPILED C MODEL', num_bits, acc3)
     #Store Accuracy of c compilation
     if args.experiment_id is not None:
         # Ensure results folder exists
