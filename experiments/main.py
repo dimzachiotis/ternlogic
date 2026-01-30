@@ -429,7 +429,9 @@ if __name__ == '__main__':
         print('\n' + '='*80)
         print(' Converting the model to C code and compiling it...')
         print('='*80)
-
+        #this loop runs the body four times, once for each C compiler optimization level
+        #-O1   (small models)
+        #-O0 (large models)
         for opt_level in range(4):
 
             for num_bits in [
