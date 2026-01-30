@@ -479,11 +479,12 @@ if __name__ == '__main__':
         # Prepare filename
         json_filename = f"./results/{args.experiment_id}_c.json"
 
-        # Wrap acc3 in a dict if it's just a float, to be JSON-friendly
-        if isinstance(acc3, float):
-            acc_data = {'accuracy': acc3}
-        else:
-            acc_data = acc3  # already dict
+        # If acc3 is a tensor, convert it to float
+        if isinstance(acc3, torch.Tensor):
+            acc3 = acc3.item()  # gets the scalar value as a float
+
+        # Wrap in dict for JSON
+        acc_data = {'accuracy': acc3}
 
         # Save to JSON
         with open(json_filename, "w") as f:
