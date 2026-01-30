@@ -471,4 +471,22 @@ if __name__ == '__main__':
                 #Accuracy of compiled model
                 acc3 = correct / total
                 print('COMPILED MODEL', num_bits, acc3)
+    #Store Accuracy of c compilation
+    if args.experiment_id is not None:
+        # Ensure results folder exists
+        os.makedirs('./results', exist_ok=True)
 
+        # Prepare filename
+        json_filename = f"./results/{args.experiment_id}_c.json"
+
+        # Wrap acc3 in a dict if it's just a float, to be JSON-friendly
+        if isinstance(acc3, float):
+            acc_data = {'accuracy': acc3}
+        else:
+            acc_data = acc3  # already dict
+
+        # Save to JSON
+        with open(json_filename, "w") as f:
+            json.dump(acc_data, f, indent=4)
+
+        print(f"Accuracy saved as JSON: {json_filename}") 
