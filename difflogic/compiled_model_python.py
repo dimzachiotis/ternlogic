@@ -1,5 +1,5 @@
 import torch
-import functional
+from .functional import bin_op
 from .difflogic import LogicLayer, GroupSum
 
 
@@ -65,7 +65,7 @@ class CompiledPython(torch.nn.Module):
                 a_idx = layer_a[i]
                 b_idx = layer_b[i]
                 op = layer_op[i]
-                layer_vals[:, i] = functional.bin_op(prev_vals[:, a_idx], prev_vals[:, b_idx], op)
+                layer_vals[:, i] = bin_op(prev_vals[:, a_idx], prev_vals[:, b_idx], op)
             prev_vals = layer_vals
 
         # GroupSum: convert last layer outputs to num_classes
