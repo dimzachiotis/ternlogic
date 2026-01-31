@@ -2,17 +2,27 @@ import torch
 from .functional import bin_op
 from .difflogic import LogicLayer, GroupSum
 
+BITS_TO_DTYPE = {
+    8:  torch.int8,
+    16: torch.int16,
+    32: torch.int32,
+    64: torch.int64,
+}
 
 class CompiledPython(torch.nn.Module):
     def __init__(
             self,
             model: torch.nn.Sequential,
             device='cpu',
+            num_bits=64,
             verbose=False,
     ):
         super(CompiledPython, self).__init__()
         self.model = model
         self.device = device
+        self.num_bits = num_bits
+        assert num_bits in [8, 16, 32, 64]
+        self.dtype = BITS_TO_DTYPE[self.num_bits]
         if self.model is not None:
             layers = []
 
@@ -32,7 +42,7 @@ class CompiledPython(torch.nn.Module):
                         first = False
                     self.num_out_per_class = layer.out_dim // self.num_classes
                     layers.append((layer.indices[0], layer.indices[1], layer.weights.argmax(1)))
-                    #Each LogicLayer defines: indices[0]: index of input A, indices[1]: index of input B and
+                    #Each LogicLayer defines: indices[0]: Tensor of indices for input A of each neuron, indices[1]: Tensor of indices for input B of each neuron and
                     #weights.argmax(1): chosen Boolean operation 
                     # In LogicLayer, weights has shape:(num_neurons, 16). The argmax(1) means:
                     # for each neuron, find the index (gate) of the largest weight across the 16 operations.                
@@ -56,22 +66,33 @@ class CompiledPython(torch.nn.Module):
         returns: torch.IntTensor of shape (batch_size, num_classes)
         """
         batch_size = x.shape[0]
-        prev_vals = x.bool().int()  # convert bool → int for bitwise ops
+        prev_vals = x.bool().to(self.dtype)  # convert bool → int for bitwise ops
 
         for layer_a, layer_b, layer_op in self.layers:
+            #number of neurons in this layer 
             num_neurons = len(layer_a)
-            layer_vals = torch.zeros(batch_size, num_neurons, dtype=torch.int32)
+            #creates the output tensor of this layer, zero initialized 
+            layer_vals = torch.zeros(batch_size, num_neurons, dtype=self.dtype,device=self.device)
+            #computes the output of each neuron
             for i in range(num_neurons):
+                #index of first input
                 a_idx = layer_a[i]
+                #indec of second input
                 b_idx = layer_b[i]
+                #operation of the neuron
                 op = layer_op[i]
+                #applies the operation 
                 layer_vals[:, i] = bin_op(prev_vals[:, a_idx], prev_vals[:, b_idx], op)
+            #sets layer output to prev_vals
             prev_vals = layer_vals
 
         # GroupSum: convert last layer outputs to num_classes
+        #Computes how many neurons contribute to each class
         neurons_per_class = prev_vals.shape[1] // self.num_classes
-        outputs = torch.zeros(batch_size, self.num_classes, dtype=torch.int32)
+        #creates the output tensor of groupsum layer, zero initialized 
+        outputs = torch.zeros(batch_size, self.num_classes, dtype=self.dtype,device=self.device)
         for c in range(self.num_classes):
+            #Sums neurons belonging to class c
             outputs[:, c] = prev_vals[:, c*neurons_per_class:(c+1)*neurons_per_class].sum(dim=1)
 
         return outputs
