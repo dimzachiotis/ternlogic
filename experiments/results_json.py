@@ -68,14 +68,14 @@ class ResultsJSON(object):
         #Converts everything into a JSON string
 
 
-        with open(os.path.join(self.path, '{:08d}.json'.format(self.eid)), mode='w') as f:
+        with open(os.path.join(self.path, f'{self.eid}_total_bin.json'), mode='w') as f:
             f.write(json_str)
         #Writes JSON string to file
     
     #Loads experiment results from a file
     @staticmethod
     def load(eid: int, path: str, get_dict=False):
-        with open(os.path.join(path, '{:08d}.json'.format(eid)), mode='r') as f:
+        with open(os.path.join(path, f'{eid}_total_bin.json'), mode='r') as f:
             data = json.loads(f.read())
         #Converts JSON back into a Python dictionary
 
