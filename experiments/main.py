@@ -407,7 +407,7 @@ if __name__ == '__main__':
     #Model Python Compilation (Optional)
     if args.compile_model:
         print('\n' + '='*80)
-        print(' Compiling model with Python...')
+        print(' Compiling model with Binary Python...')
         print('='*80)
         for num_bits in [
                 # 8,
@@ -442,7 +442,7 @@ if __name__ == '__main__':
                     os.makedirs('./results', exist_ok=True)
 
                     # Prepare filename
-                    json_filename = f"./results/{args.experiment_id}_{num_bits}_python.json"
+                    json_filename = f"./results/{args.experiment_id}_{num_bits}_bin.json"
 
                     # If python_acc is a tensor, convert it to float
                     if isinstance(python_acc, torch.Tensor):
@@ -459,70 +459,70 @@ if __name__ == '__main__':
 
     ####################################################################################################################
 
-    #Model C Compilation (Optional)
-    if args.compile_model:
-        print('\n' + '='*80)
-        print(' Converting the model to C code and compiling it...')
-        print('='*80)
-        #this loop runs the body four times, once for each C compiler optimization level
-        #-O1   (small models)
-        #-O0 (large models)
-        for opt_level in range(4):
+    # #Model C Compilation (Optional)
+    # if args.compile_model:
+    #     print('\n' + '='*80)
+    #     print(' Converting the model to C code and compiling it...')
+    #     print('='*80)
+    #     #this loop runs the body four times, once for each C compiler optimization level
+    #     #-O1   (small models)
+    #     #-O0 (large models)
+    #     for opt_level in range(4):
 
-            for num_bits in [
-                # 8,
-                # 16,
-                # 32,
-                64
-            ]:
-                os.makedirs('lib', exist_ok=True)
-                save_lib_path = 'lib/{:08d}_{}.so'.format(
-                    args.experiment_id if args.experiment_id is not None else 0, num_bits
-                )
-                #Converts logic network into pure C code
-                compiled_model = CompiledLogicNet(
-                    model=model,
-                    num_bits=num_bits,
-                    cpu_compiler='gcc',
-                    # cpu_compiler='clang',
-                    verbose=False,
-                )
+    #         for num_bits in [
+    #             # 8,
+    #             # 16,
+    #             # 32,
+    #             64
+    #         ]:
+    #             os.makedirs('lib', exist_ok=True)
+    #             save_lib_path = 'lib/{:08d}_{}.so'.format(
+    #                 args.experiment_id if args.experiment_id is not None else 0, num_bits
+    #             )
+    #             #Converts logic network into pure C code
+    #             compiled_model = CompiledLogicNet(
+    #                 model=model,
+    #                 num_bits=num_bits,
+    #                 cpu_compiler='gcc',
+    #                 # cpu_compiler='clang',
+    #                 verbose=False,
+    #             )
 
-                compiled_model.compile(
-                    opt_level=1 if args.num_layers * args.num_neurons < 50_000 else 0,
-                    save_lib_path=save_lib_path,
-                    verbose=False
-                )
+    #             compiled_model.compile(
+    #                 opt_level=1 if args.num_layers * args.num_neurons < 50_000 else 0,
+    #                 save_lib_path=save_lib_path,
+    #                 verbose=False
+    #             )
 
-                correct, total = 0, 0
-                with torch.no_grad():
-                    for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
-                        data = torch.nn.Flatten()(data).bool().numpy()
-                        #Executes compiled C model
-                        output = compiled_model(data, verbose=False)
+    #             correct, total = 0, 0
+    #             with torch.no_grad():
+    #                 for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
+    #                     data = torch.nn.Flatten()(data).bool().numpy()
+    #                     #Executes compiled C model
+    #                     output = compiled_model(data, verbose=False)
 
-                        correct += (output.argmax(-1) == labels).float().sum()
-                        total += output.shape[0]
-                #Accuracy of compiled model
-                c_acc = correct / total
-                print('COMPILED C MODEL', num_bits, c_acc)
-    #Store Accuracy of c compilation
-    if args.experiment_id is not None:
-        # Ensure results folder exists
-        os.makedirs('./results', exist_ok=True)
+    #                     correct += (output.argmax(-1) == labels).float().sum()
+    #                     total += output.shape[0]
+    #             #Accuracy of compiled model
+    #             c_acc = correct / total
+    #             print('COMPILED C MODEL', num_bits, c_acc)
+    # #Store Accuracy of c compilation
+    # if args.experiment_id is not None:
+    #     # Ensure results folder exists
+    #     os.makedirs('./results', exist_ok=True)
 
-        # Prepare filename
-        json_filename = f"./results/{args.experiment_id}_{num_bits}_c.json"
+    #     # Prepare filename
+    #     json_filename = f"./results/{args.experiment_id}_{num_bits}_c.json"
 
-        # If c_acc is a tensor, convert it to float
-        if isinstance(c_acc, torch.Tensor):
-            c_acc = c_acc.item()  # gets the scalar value as a float
+    #     # If c_acc is a tensor, convert it to float
+    #     if isinstance(c_acc, torch.Tensor):
+    #         c_acc = c_acc.item()  # gets the scalar value as a float
 
-        # Wrap in dict for JSON
-        acc_data = {'accuracy': c_acc}
+    #     # Wrap in dict for JSON
+    #     acc_data = {'accuracy': c_acc}
 
-        # Save to JSON
-        with open(json_filename, "w") as f:
-            json.dump(acc_data, f, indent=4)
+    #     # Save to JSON
+    #     with open(json_filename, "w") as f:
+    #         json.dump(acc_data, f, indent=4)
 
-        print(f"c_acc saved as JSON: {json_filename}") 
+    #     print(f"c_acc saved as JSON: {json_filename}") 
