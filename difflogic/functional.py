@@ -31,9 +31,9 @@ def bin_op(a, b, i):
     if i == 0:
         return torch.zeros_like(a)
     elif i == 1:
-        return a * b
+        return 1-abs(a-b)
     elif i == 2:
-        return a + b - a * b
+        return abs(a-b)
     elif i == 3:
         return torch.full_like(a,0.5)
     elif i == 4:
