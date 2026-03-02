@@ -30,7 +30,6 @@ from difflogic.difflogic import LogicLayer, GroupSum
 from difflogic.packbitstensor import PackBitsTensor
 from difflogic.compiled_model import CompiledLogicNet
 from difflogic.compiled_ternary_model_python import CompiledTernaryPython
-from difflogic.compiled_binary_model_python import CompiledBinaryPython
 
 device ='cpu' if  not torch.cuda.is_available() else 'cuda'
 #if no cuda available, then use cpu
