@@ -9,7 +9,7 @@ BITS_TO_DTYPE = {
     64: torch.int64,
 }
 
-class CompiledPython(torch.nn.Module):
+class CompiledBinaryPython(torch.nn.Module):
     def __init__(
             self,
             model: torch.nn.Sequential,
@@ -17,7 +17,7 @@ class CompiledPython(torch.nn.Module):
             num_bits=64,
             verbose=False,
     ):
-        super(CompiledPython, self).__init__()
+        super(CompiledBinaryPython, self).__init__()
         self.model = model
         self.device = device
         self.num_bits = num_bits

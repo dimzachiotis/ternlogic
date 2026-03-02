@@ -9,7 +9,7 @@ BITS_TO_DTYPE = {
 }
 #float cause vals are 0 0.5 or 1
 
-class CompiledPython(torch.nn.Module):
+class CompiledTernaryPython(torch.nn.Module):
     def __init__(
             self,
             model: torch.nn.Sequential,
@@ -17,7 +17,7 @@ class CompiledPython(torch.nn.Module):
             num_bits=64,
             verbose=False,
     ):
-        super(CompiledPython, self).__init__()
+        super(CompiledTernaryPython, self).__init__()
         self.model = model
         self.device = device
         self.num_bits = num_bits
