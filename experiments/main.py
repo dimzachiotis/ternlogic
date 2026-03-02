@@ -429,7 +429,7 @@ if __name__ == '__main__':
     #Ternary Model Python Compilation (Optional)
     if args.compile_model:
         print('\n' + '='*80)
-        print(' Compiling model with Python...')
+        print(' Compiling model with Ternary Python...')
         print('='*80)
         for num_bits in [
                 # 16,
@@ -448,7 +448,6 @@ if __name__ == '__main__':
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
                         #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
                         data = torch.nn.Flatten()(data)
-
                         # ternary quantization to {0, 0.5, 1}
                         data = torch.where(data < 0.25, 0.0,
                             torch.where(data > 0.75, 1.0, 0.5))
