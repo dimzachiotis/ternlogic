@@ -29,7 +29,7 @@ if top_level_dir not in sys.path:
 from difflogic.difflogic import LogicLayer, GroupSum
 from difflogic.packbitstensor import PackBitsTensor
 from difflogic.compiled_model import CompiledLogicNet
-from difflogic.compiled_model_python import CompiledPython
+from difflogic.compiled_ternary_model_python import CompiledPython
 
 device ='cpu' if  not torch.cuda.is_available() else 'cuda'
 #if no cuda available, then use cpu
