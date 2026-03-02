@@ -446,8 +446,13 @@ if __name__ == '__main__':
                 correct, total = 0, 0
                 with torch.no_grad():
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
-                        #flattens the input tensor to 1D per sample and converts the data to boolean values (0 or 1). shape[batch size,product of dimesions of data]
-                        data = torch.nn.Flatten()(data).bool()
+                        #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
+                        data = torch.nn.Flatten()(data)
+
+                        # ternary quantization to {0, 0.5, 1}
+                        data = torch.where(data < 0.25, 0.0,
+                            torch.where(data > 0.75, 1.0, 0.5))
+
                         #Returns predictions as outputs shape[batch size,number of classes]
                         output = compiled_model.forward(data)
 
