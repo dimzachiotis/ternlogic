@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+venv/
+.env/
+
+# VS Code
+.vscode/
+
+# Data
+data-mnist/
+
+# Experiment outputs
+results/
+
+# OS
+.DS_Store
+Thumbs.db
+
+lib/
