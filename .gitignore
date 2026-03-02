@@ -12,6 +12,7 @@ venv/
 # Data
 data-mnist/
 data-uci/
+data-cifar/
 # Experiment outputs
 results/
 
