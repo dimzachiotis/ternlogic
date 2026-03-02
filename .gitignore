@@ -11,7 +11,7 @@ venv/
 
 # Data
 data-mnist/
-
+data-uci/
 # Experiment outputs
 results/
 
