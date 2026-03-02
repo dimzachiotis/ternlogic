@@ -3,11 +3,11 @@ from .functional import bin_op
 from .difflogic import LogicLayer, GroupSum
 
 BITS_TO_DTYPE = {
-    8:  torch.int8,
-    16: torch.int16,
-    32: torch.int32,
-    64: torch.int64,
+    16: torch.float16,
+    32: torch.float32,
+    64: torch.float64,
 }
+#float cause vals are 0 0.5 or 1
 
 class CompiledPython(torch.nn.Module):
     def __init__(
@@ -21,7 +21,7 @@ class CompiledPython(torch.nn.Module):
         self.model = model
         self.device = device
         self.num_bits = num_bits
-        assert num_bits in [8, 16, 32, 64]
+        assert num_bits in [16, 32, 64]
         self.dtype = BITS_TO_DTYPE[self.num_bits]
         if self.model is not None:
             layers = []
@@ -62,11 +62,27 @@ class CompiledPython(torch.nn.Module):
 
     def forward(self, x):
         """
-        x: torch.BoolTensor of shape (batch_size, num_inputs)
-        returns: torch.IntTensor of shape (batch_size, num_classes)
+        x: torch.FloatTensor of shape (batch_size, num_inputs)
+        returns: torch.FloatTensor of shape (batch_size, num_classes)
         """
         batch_size = x.shape[0]
-        prev_vals = x.bool().to(self.dtype)  # convert bool → int for bitwise ops
+        prev_vals = x.to(self.dtype)
+
+        zero = torch.tensor(0.0, device=self.device, dtype=self.dtype)
+        half = torch.tensor(0.5, device=self.device, dtype=self.dtype)
+        one = torch.tensor(1.0, device=self.device, dtype=self.dtype)
+
+        allowed = (
+            torch.isclose(prev_vals, zero, atol=1e-6) |
+            torch.isclose(prev_vals, half, atol=1e-6) |
+            torch.isclose(prev_vals, one, atol=1e-6)
+        )
+        #allowed values for prev_vals
+
+
+        if not torch.all(allowed):
+            raise ValueError("Input x must contain only 0, 0.5, or 1.")
+        #Raise an error if any value is not 0, 0.5, or 1 
 
         for layer_a, layer_b, layer_op in self.layers:
             #number of neurons in this layer 
