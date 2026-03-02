@@ -455,8 +455,8 @@ if __name__ == '__main__':
                         correct += (output.argmax(-1) == labels).float().sum()
                         total += output.shape[0]
                 #Accuracy of compiled model
-                python_acc = correct / total
-                print('COMPILED PYTHON MODEL', num_bits , python_acc)
+                tern_acc = correct / total
+                print('COMPILED PYTHON MODEL', num_bits , tern_acc)
 
                 #Store Accuracy of python compilation
                 if args.experiment_id is not None:
@@ -464,87 +464,19 @@ if __name__ == '__main__':
                     os.makedirs('./results', exist_ok=True)
 
                     # Prepare filename
-                    json_filename = f"./results/{args.experiment_id}_{num_bits}_python.json"
+                    json_filename = f"./results/{args.experiment_id}_{num_bits}_ternary.json"
 
-                    # If python_acc is a tensor, convert it to float
-                    if isinstance(python_acc, torch.Tensor):
-                        python_acc = python_acc.item()  # gets the scalar value as a float
+                    # If tern_acc is a tensor, convert it to float
+                    if isinstance(tern_acc, torch.Tensor):
+                        tern_acc = tern_acc.item()  # gets the scalar value as a float
 
                     # Wrap in dict for JSON
-                    acc_data = {'accuracy': python_acc}
+                    acc_data = {'accuracy': tern_acc}
 
                     # Save to JSON
                     with open(json_filename, "w") as f:
                         json.dump(acc_data, f, indent=4)
 
-                    print(f"python_acc saved as JSON: {json_filename}") 
-            #Model Compilation (Optional)
-####################################################################################################################
-    
-    #Model C Compilation (Optional)
-    if args.compile_model:
-        print('\n' + '='*80)
-        print(' Converting the model to C code and compiling it...')
-        print('='*80)
-
-        for opt_level in range(4):
-
-            for num_bits in [
-                # 8,
-                # 16,
-                # 32,
-                64
-            ]:
-                os.makedirs('lib', exist_ok=True)
-                save_lib_path = 'lib/{:08d}_{}.so'.format(
-                    args.experiment_id if args.experiment_id is not None else 0, num_bits
-                )
-                #Converts logic network into pure C code
-                compiled_model = CompiledLogicNet(
-                    model=model,
-                    num_bits=num_bits,
-                    cpu_compiler='gcc',
-                    # cpu_compiler='clang',
-                    verbose=True,
-                )
-
-                compiled_model.compile(
-                    opt_level=1 if args.num_layers * args.num_neurons < 50_000 else 0,
-                    save_lib_path=save_lib_path,
-                    verbose=True
-                )
-
-                correct, total = 0, 0
-                with torch.no_grad():
-                    for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
-                        data = torch.nn.Flatten()(data).bool().numpy()
-                        #Executes compiled C model
-                        output = compiled_model(data, verbose=True)
-
-                        correct += (output.argmax(-1) == labels).float().sum()
-                        total += output.shape[0]
-                #Accuracy of compiled model
-                acc3 = correct / total
-                print('COMPILED MODEL', num_bits, acc3)
-
-    #Store Accuracy of c compilation
-    if args.experiment_id is not None:
-        # Ensure results folder exists
-        os.makedirs('./results', exist_ok=True)
-
-        # Prepare filename
-        json_filename = f"./results/{args.experiment_id}_c.json"
-
-        # If acc3 is a tensor, convert it to float
-        if isinstance(acc3, torch.Tensor):
-            acc3 = acc3.item()  # gets the scalar value as a float
-
-        # Wrap in dict for JSON
-        acc_data = {'accuracy': acc3}
+                    print(f"python_ternary_acc saved as JSON: {json_filename}") 
 
 
-        # Save to JSON
-        with open(json_filename, "w") as f:
-            json.dump(acc_data, f, indent=4)
-
-        print(f"Accuracy saved as JSON: {json_filename}")        
