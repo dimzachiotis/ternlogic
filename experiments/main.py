@@ -254,7 +254,7 @@ def eval(model, loader, mode):
         #Restores original mode
     return res.item()
 
-
+#in case you want to use cuda in the future you have to change this function so it follows ternary logic (delete .bool)
 def packbits_eval(model, loader):
     orig_mode = model.training
     with torch.no_grad():
