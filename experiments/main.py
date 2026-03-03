@@ -418,7 +418,7 @@ if __name__ == '__main__':
                 print(f"Layer {i}: weights shape={weights.shape}, mean={weights.mean():.4f}, std={weights.std():.4f}")
 
         # Save as JSON file (human-readable, can open in any text editor)
-        json_filename = f"./results/trained_weights_{args.experiment_id}.json"
+        json_filename = f"./results/trained_weights_{args.experiment_id}_1.json"
         weights_json = {f"layer_{i}": w.tolist() for i, w in enumerate(layer_weights)}
         with open(json_filename, "w") as f:
             json.dump(weights_json, f)
@@ -467,7 +467,7 @@ if __name__ == '__main__':
                     os.makedirs('./results', exist_ok=True)
 
                     # Prepare filename
-                    json_filename = f"./results/{args.experiment_id}_{num_bits}_ternary.json"
+                    json_filename = f"./results/{args.experiment_id}_{num_bits}_ternary_1.json"
 
                     # If tern_acc is a tensor, convert it to float
                     if isinstance(tern_acc, torch.Tensor):
