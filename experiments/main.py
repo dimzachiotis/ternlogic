@@ -238,21 +238,44 @@ def train(model, x, y, loss_fn, optimizer):
     #returns a scalar
 
 def eval(model, loader, mode):
+    # Store original model training state (important for restoring later)
     orig_mode = model.training
-    #Stores original train/eval mode
+
+    # Disable gradient computation since evaluation should not update model parameters
     with torch.no_grad():
+
+        # Switch model to evaluation or training mode depending on input argument
+        # This is useful if model contains layers behaving differently during train/eval
         model.train(mode=mode)
-        #Allows evaluating in training mode or eval mode
+
+        # Compute mean accuracy across all batches
         res = np.mean(
             [
-                (model(x.to(device).round()).argmax(-1) == y.to(device)).to(torch.float32).mean().item()
+                (
+                    # Forward pass after ternary quantization
+                    # Ternary quantization maps input into:
+                    # {0.0, 0.5, 1.0}
+                    lambda q: (model(q).argmax(-1) == y.to(device))
+                    .to(torch.float32)
+                    .mean()
+                    .item()
+                )(
+                    # Move tensor to computation device and apply ternary thresholding
+                    torch.where(
+                        (q := x.to(device)) < 0.25,
+                        0.0,
+                        torch.where(q > 0.75, 1.0, 0.5)
+                    )
+                )
                 for x, y in loader
             ]
         )
-        #Mean accuracy across batches
+
+        # Restore model to original training state
         model.train(mode=orig_mode)
-        #Restores original mode
-    return res.item()
+
+    return res
+
 
 #in case you want to use cuda in the future you have to change this function so it follows ternary logic (delete .bool)
 def packbits_eval(model, loader):
