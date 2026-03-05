@@ -195,7 +195,7 @@ class LogicLayer(torch.nn.Module):
 #Used at output layer
 class GroupSum(torch.nn.Module):
     #The GroupSum module.
-    def __init__(self, k: int, tau: float = 1., device='cuda'):
+    def __init__(self, k: int, tau: float = 1., device='cpu'):
         """
 
         :param k: number of intended real valued outputs, e.g., number of classes
