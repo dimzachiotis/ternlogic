@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 BITS_TO_NP_DTYPE = {8: np.int8, 16: np.int16, 32: np.int32, 64: np.int64}
-number_of_gates=11
+number_of_gates=17
 # | id | Operator             | AB=00 | AB=01 | AB=02 | AB=10 | AB=11 | AB=12 | AB=20 | AB=21 | AB=22 |
 # |----|----------------------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
 # | 0  | 0                    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
@@ -12,10 +12,17 @@ number_of_gates=11
 # | 4  | A                    | 0     | 0     | 0     | 1     | 1     | 1     | 2     | 2     | 2     |
 # | 5  | B                    | 0     | 1     | 2     | 0     | 1     | 2     | 0     | 1     | 2     |
 # | 6  | |1-A|                | 1     | 1     | 1     | 0     | 0     | 0     | 1     | 1     | 1     |
-# | 7  | |1-B|                | 1     | 0     | 2     | 1     | 0     | 1     | 1     | 0     | 1     |
-# | 8  | |A-B|                | 0     | 1     | 2     | 1     | 0     | 1     | 2     | 1     | 0     |
-# | 9  | 2 - |A-B|            | 0     | 1     | 0     | 1     | 2     | 1     | 0     | 1     | 2     |
-# | 10 | 2                    | 2     | 2     | 2     | 2     | 2     | 2     | 2     | 2     | 2     |
+# | 7  | |1-B|                | 1     | 0     | 1     | 1     | 0     | 1     | 1     | 0     | 1     |
+# | 8  | |1-A| +1             | 2     | 2     | 2     | 1     | 1     | 1     | 2     | 2     | 2     |
+# | 9  | |1-B| +1             | 2     | 1     | 2     | 2     | 1     | 2     | 2     | 1     | 2     |
+# | 10 | 2-|1-A|              | 1     | 1     | 1     | 2     | 2     | 2     | 1     | 1     | 1     |
+# | 11 | 2-|1-B|              | 1     | 2     | 1     | 1     | 2     | 1     | 1     | 2     | 1     |
+# | 12 | |A-B|                | 0     | 1     | 2     | 1     | 0     | 1     | 2     | 1     | 0     |
+# | 13 | |1-|A-B| |           | 1     | 0     | 1     | 0     | 1     | 0     | 1     | 0     | 1     |
+# | 14 | |1-|A-B| | +1        | 2     | 1     | 2     | 1     | 2     | 1     | 2     | 1     | 2     |
+# | 15 | 2 - |A-B|            | 0     | 1     | 0     | 1     | 2     | 1     | 0     | 1     | 2     |
+# | 16 | 2                    | 2     | 2     | 2     | 2     | 2     | 2     | 2     | 2     | 2     |
+
 
 
 
@@ -44,10 +51,22 @@ def bin_op(a, b, i):
     elif i == 7:
         return torch.abs(1-b)
     elif i == 8:
-        return torch.abs(a-b)
+        return 2-torch.abs(1-a)
     elif i == 9:
-        return 2 - torch.abs(a-b)
+        return 2-torch.abs(1-b)
     elif i == 10:
+        return torch.abs(1-a)
+    elif i == 11:
+        return torch.abs(1-b)
+    elif i == 12:
+        return torch.abs(a-b)
+    elif i == 13:
+        return torch.abs(1-torch.abs(a-b))
+    elif i == 14:
+        return torch.abs(1-torch.abs(a-b))+1
+    elif i == 15:    
+        return 2 - torch.abs(a-b)
+    elif i == 16:
         return torch.full_like(a,2)
 
 #Implements the relaxation form of each ternary logic gate
