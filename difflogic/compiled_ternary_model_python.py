@@ -3,11 +3,12 @@ from .functional import bin_op
 from .difflogic import LogicLayer, GroupSum
 
 BITS_TO_DTYPE = {
-    16: torch.float16,
-    32: torch.float32,
-    64: torch.float64,
+    8:  torch.int8,
+    16: torch.int16,
+    32: torch.int32,
+    64: torch.int64,
 }
-#float cause vals are 0 0.5 or 1
+#Int cause vals are 0 1 or 2
 
 class CompiledTernaryPython(torch.nn.Module):
     def __init__(
@@ -17,11 +18,17 @@ class CompiledTernaryPython(torch.nn.Module):
             num_bits=64,
             verbose=False,
     ):
+        """
+        :param model:      GNN model that user wants to test
+        :param device:      device (options: 'cuda' / 'cpu')
+        :param num_bits: bits accuracy (options: 64,32,16,8)
+        :param verbose: if true prints steps
+        """
         super(CompiledTernaryPython, self).__init__()
         self.model = model
         self.device = device
         self.num_bits = num_bits
-        assert num_bits in [16, 32, 64]
+        assert num_bits in [8, 16, 32, 64]
         self.dtype = BITS_TO_DTYPE[self.num_bits]
         if self.model is not None:
             layers = []
@@ -44,7 +51,7 @@ class CompiledTernaryPython(torch.nn.Module):
                     layers.append((layer.indices[0], layer.indices[1], layer.weights.argmax(1)))
                     #Each LogicLayer defines: indices[0]: Tensor of indices for input A of each neuron, indices[1]: Tensor of indices for input B of each neuron and
                     #weights.argmax(1): chosen Boolean operation 
-                    # In LogicLayer, weights has shape:(num_neurons, 16). The argmax(1) means:
+                    # In LogicLayer, weights has shape:(num_neurons, num_of_gates). The argmax(1) means:
                     # for each neuron, find the index (gate) of the largest weight across the 16 operations.                
                 elif isinstance(layer, torch.nn.Flatten):
                     if verbose:
@@ -62,27 +69,27 @@ class CompiledTernaryPython(torch.nn.Module):
 
     def forward(self, x):
         """
-        x: torch.FloatTensor of shape (batch_size, num_inputs)
-        returns: torch.FloatTensor of shape (batch_size, num_classes)
+        x: torch.IntTensor of shape (batch_size, num_inputs)
+        returns: torch.IntTensor of shape (batch_size, num_classes)
         """
         batch_size = x.shape[0]
         prev_vals = x.to(self.dtype)
 
-        zero = torch.tensor(0.0, device=self.device, dtype=self.dtype)
-        half = torch.tensor(0.5, device=self.device, dtype=self.dtype)
-        one = torch.tensor(1.0, device=self.device, dtype=self.dtype)
+        zero = torch.tensor(0, device=self.device, dtype=self.dtype)
+        one = torch.tensor(1, device=self.device, dtype=self.dtype)
+        two = torch.tensor(2, device=self.device, dtype=self.dtype)
 
         allowed = (
-            torch.isclose(prev_vals, zero, atol=1e-6) |
-            torch.isclose(prev_vals, half, atol=1e-6) |
-            torch.isclose(prev_vals, one, atol=1e-6)
+            (prev_vals == zero) |
+            (prev_vals == one) |
+            (prev_vals == two)
         )
         #allowed values for prev_vals
 
 
         if not torch.all(allowed):
-            raise ValueError("Input x must contain only 0, 0.5, or 1.")
-        #Raise an error if any value is not 0, 0.5, or 1 
+            raise ValueError("Input x must contain only 0, 1, or 2.")
+        #Raise an error if any value is not 0, 1, or 2 
 
         for layer_a, layer_b, layer_op in self.layers:
             #number of neurons in this layer 
