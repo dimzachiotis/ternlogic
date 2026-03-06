@@ -21,7 +21,7 @@ class CompiledTernaryPython(torch.nn.Module):
         """
         :param model:      GNN model that user wants to test
         :param device:      device (options: 'cuda' / 'cpu')
-        :param num_bits: bits accuracy (options: 64,32,16,8)
+        :param num_bits: bits accuracy (options: 64,32,16)
         :param verbose: if true prints steps
         """
         super(CompiledTernaryPython, self).__init__()
