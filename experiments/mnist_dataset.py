@@ -22,7 +22,7 @@ from torchvision.datasets.vision import VisionDataset
 class MNISTRemoveBorderTransform:
     # __call__ expects an image with values in [0, 1]. ToTensor() has to be applied previously,cause if not it will brake
     def __call__(self, image: torch.Tensor) -> torch.Tensor:
-        horizontal_black_lines = (image == 0.).all(dim=2)
+        horizontal_black_lines = (image == -1.).all(dim=2)
         #detects entire horizontal black rows. returns tensor with boolean values
         #set the threshold to 0.25
         top_black = 0
@@ -49,7 +49,7 @@ class MNISTRemoveBorderTransform:
         assert top_black + bottom_black == 8, (top_black, bottom_black)
         image = image[:, top_black:28 - bottom_black]
         #Crop vertically
-        vertical_black_lines = (image <= 0.).all(dim=1)
+        vertical_black_lines = (image <= -1.).all(dim=1)
         #set the threshold to 0.25
         #Detects entire black columns.
         left_black = 0
@@ -176,14 +176,14 @@ class MNIST(VisionDataset):
 
             self.transform = torchvision.transforms.Compose([
                 transform,
-                torchvision.transforms.Lambda(lambda x: x * 2.0),   # <-- scale to [0,2]
+                torchvision.transforms.Lambda(lambda x: x * 2.0 - 1.0),   # <-- scale to [-1,1]
                 MNISTRemoveBorderTransform(),
             ])
         else:
             if transform is None:
                 self.transform = torchvision.transforms.Compose([
                     torchvision.transforms.ToTensor(),
-                    torchvision.transforms.Lambda(lambda x: x * 2.0),   # <-- scale to [0,2]
+                    torchvision.transforms.Lambda(lambda x: x * 2.0 - 1.0),   # <-- scale to [-1,1]
                 ])
 
 
