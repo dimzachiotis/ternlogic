@@ -3,21 +3,18 @@ import numpy as np
 
 BITS_TO_NP_DTYPE = {8: np.int8, 16: np.int16, 32: np.int32, 64: np.int64}
 number_of_gates=9
-# | id | Operator             | AB=00 | AB=00.5 | AB=01 | AB=0.50 | AB=0.50.5 | AB=0.51 | AB=10 | AB=10.5 | AB=11 |
-# |----|----------------------|-------|---------|-------|---------|-----------|---------|-------|---------|-------|
-# | 0  | 0                    | 0     | 0       | 0     | 0       | 0         | 0       | 0     | 0       | 0     |
-# | 1  | A and B              | 0     | 0       | 0     | 0       | NP        | 0.5     | 0     | 0.5     | 1     |
-# | 2  | A or B               | 0     | 0.5     | 1     | 0.5     | NP        | 1       | 1     | 1       | 1     |
-# | 3  | 0.5                  | 0.5   | 0.5     | 0.5   | 0.5     | 0.5       | 0.5     | 0.5   | 0.5     | 0.5   |
-# | 4  | A                    | 0     | 0       | 0     | 0.5     | 0.5       | 0.5     | 1     | 1       | 1     |
-# | 5  | B                    | 0     | 0.5     | 1     | 0       | 0.5       | 1       | 0     | 0.5     | 1     |
-# | 6  | not(A)               | 1     | 1       | 1     | 0.5     | 0.5       | 0.5     | 0     | 0       | 0     |
-# | 7  | not(B)               | 1     | 0.5     | 0     | 1       | 0.5       | 0       | 1     | 0.5     | 0     |
-# | 8  | forward_cycling(A)   | 0.5   | 0.5     | 0.5   | 1       | 1         | 1       | 0     | 0       | 0     |
-# | 9  | forward_cycling(B)   | 0.5   | 1       | 0     | 0.5     | 1         | 0.5     | 1     | 1       | 0     |
-# | 10 | backward_cycling(A)  | 1     | 1       | 1     | 0       | 0         | 0       | 0.5   | 0.5     | 0.5   |
-# | 11 | backward_cycling(B)  | 1     | 0       | 0.5   | 1       | 0         | 0.5     | 1     | 0       | 0.5   |
-# | 12 | 1                    | 1     | 1       | 1     | 1       | 1         | 1       | 1     | 1       | 1     |
+# | id | Operator             | AB=00 | AB=01 | AB=02 | AB=10 | AB=11 | AB=12 | AB=20 | AB=21 | AB=22 |
+# |----|----------------------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
+# | 0  | 0                    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
+# | 1  | 2 - A                | 2     | 2     | 2     | 1     | 1     | 1     | 0     | 0     | 0     |
+# | 2  | 2 - B                | 2     | 1     | 0     | 2     | 1     | 0     | 2     | 1     | 0     |
+# | 3  | 1                    | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
+# | 4  | A                    | 0     | 0     | 0     | 1     | 1     | 1     | 2     | 2     | 2     |
+# | 5  | B                    | 0     | 1     | 2     | 0     | 1     | 2     | 0     | 1     | 2     |
+# | 6  | |A-B|                | 0     | 1     | 2     | 1     | 0     | 1     | 2     | 1     | 0     |
+# | 7  | 2 - |A-B|            | 0     | 1     | 0     | 1     | 2     | 1     | 0     | 1     | 2     |
+# | 8  | 2                    | 2     | 2     | 2     | 2     | 2     | 2     | 2     | 2     | 2     |
+
 
 
 #This function returns the value of the form of the ith ternary logic gate shown above
@@ -31,21 +28,21 @@ def bin_op(a, b, i):
     if i == 0:
         return torch.zeros_like(a)
     elif i == 1:
-        return 1-abs(a-b)
+        return 2 - a
     elif i == 2:
-        return abs(a-b)
+        return 2 - b
     elif i == 3:
-        return torch.full_like(a,0.5)
+        return torch.ones_like(a)
     elif i == 4:
         return a
     elif i == 5:
         return b
     elif i == 6:
-        return 1 - a
+        return torch.abs(a-b)
     elif i == 7:
-        return 1 - b
+        return 2 - torch.abs(a-b)
     elif i == 8:
-        return torch.ones_like(a)
+        return torch.full_like(a,2)
 
 #Implements the relaxation form of each ternary logic gate
 
