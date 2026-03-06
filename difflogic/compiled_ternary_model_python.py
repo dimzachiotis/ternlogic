@@ -8,7 +8,7 @@ BITS_TO_DTYPE = {
     32: torch.int32,
     64: torch.int64,
 }
-#Int cause vals are 0 1 or 2
+#Int cause vals are 0 -1 or 1
 
 class CompiledTernaryPython(torch.nn.Module):
     def __init__(
@@ -76,20 +76,20 @@ class CompiledTernaryPython(torch.nn.Module):
         prev_vals = x.to(self.dtype)
 
         zero = torch.tensor(0, device=self.device, dtype=self.dtype)
-        one = torch.tensor(1, device=self.device, dtype=self.dtype)
-        two = torch.tensor(2, device=self.device, dtype=self.dtype)
+        oneplus = torch.tensor(1, device=self.device, dtype=self.dtype)
+        oneminus = torch.tensor(-1, device=self.device, dtype=self.dtype)
 
         allowed = (
             (prev_vals == zero) |
-            (prev_vals == one) |
-            (prev_vals == two)
+            (prev_vals == oneplus) |
+            (prev_vals == oneminus)
         )
         #allowed values for prev_vals
 
 
         if not torch.all(allowed):
-            raise ValueError("Input x must contain only 0, 1, or 2.")
-        #Raise an error if any value is not 0, 1, or 2 
+            raise ValueError("Input x must contain only 0, -1, or 1.")
+        #Raise an error if any value is not 0, -1, or 1 
 
         for layer_a, layer_b, layer_op in self.layers:
             #number of neurons in this layer 
