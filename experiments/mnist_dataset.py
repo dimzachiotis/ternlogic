@@ -176,11 +176,16 @@ class MNIST(VisionDataset):
 
             self.transform = torchvision.transforms.Compose([
                 transform,
+                torchvision.transforms.Lambda(lambda x: x * 2.0),   # <-- scale to [0,2]
                 MNISTRemoveBorderTransform(),
             ])
         else:
             if transform is None:
-                self.transform = torchvision.transforms.ToTensor()
+                self.transform = torchvision.transforms.Compose([
+                    torchvision.transforms.ToTensor(),
+                    torchvision.transforms.Lambda(lambda x: x * 2.0),   # <-- scale to [0,2]
+                ])
+
 
     #This function checks if processed/ exists and also checks if .pt files are valid
     def _check_legacy_exist(self):
