@@ -7,7 +7,7 @@ from .packbitstensor import PackBitsTensor
 
 
 ########################################################################################################################
-number_of_gates=9
+number_of_gates=15
 
 class LogicLayer(torch.nn.Module):
     #The core module for differentiable logic gate networks. Provides a differentiable logic gate layer.

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 BITS_TO_NP_DTYPE = {8: np.int8, 16: np.int16, 32: np.int32, 64: np.int64}
-number_of_gates=9
+number_of_gates=15
 # | id | Operator             | AB=00 | AB=00.5 | AB=01 | AB=0.50 | AB=0.50.5 | AB=0.51 | AB=10 | AB=10.5 | AB=11 |
 # |----|----------------------|-------|---------|-------|---------|-----------|---------|-------|---------|-------|
 # | 0  | 0                    | 0     | 0       | 0     | 0       | 0         | 0       | 0     | 0       | 0     |
@@ -11,9 +11,15 @@ number_of_gates=9
 # | 3  | 0.5                  | 0.5   | 0.5     | 0.5   | 0.5     | 0.5       | 0.5     | 0.5   | 0.5     | 0.5   |
 # | 4  | A                    | 0     | 0       | 0     | 0.5     | 0.5       | 0.5     | 1     | 1       | 1     |
 # | 5  | B                    | 0     | 0.5     | 1     | 0       | 0.5       | 1       | 0     | 0.5     | 1     |
-# | 6  | 1-a                  | 1     | 1       | 1     | 0.5     | 0.5       | 0.5     | 0     | 0       | 0     |
-# | 7  | 1-b                  | 1     | 0.5     | 0     | 1       | 0.5       | 0       | 1     | 0.5     | 0     |
-# | 8  | 1                    | 1     | 1       | 1     | 1       | 1         | 1       | 1     | 1       | 1     |
+# | 6  | |0.5-a|              | 0.5   | 0.5     | 0.5   | 0       | 0         | 0       | 0.5   | 0.5     | 0.5   |
+# | 7  | |0.5-b|              | 0.5   | 0       | 0.5   | 0.5     | 0         | 0.5     | 0.5   | 0       | 0.5   |
+# | 8  | |0.5-a| +0.5         | 1     | 1       | 1     | 0.5     | 0.5       | 0.5     | 1     | 1       | 1     |
+# | 9  | |0.5-b| +0.5         | 1     | 0.5     | 1     | 1       | 0.5       | 1       | 1     | 0.5     | 1     |
+# | 10  | 1-a                 | 1     | 1       | 1     | 0.5     | 0.5       | 0.5     | 0     | 0       | 0     |
+# | 11  | 1-b                 | 1     | 0.5     | 0     | 1       | 0.5       | 0       | 1     | 0.5     | 0     |
+# | 12  | 1 - |0.5-a|         | 0.5   | 0.5     | 0.5   | 1       | 1         | 1       | 0.5   | 0.5     | 0.5   |
+# | 13  | 1 - |0.5-b|         | 0.5   | 1       | 0.5   | 0.5     | 1         | 0.5     | 0.5   | 1       | 0.5   |
+# | 14  | 1                   | 1     | 1       | 1     | 1       | 1         | 1       | 1     | 1       | 1     |
 
 
 #This function returns the value of the form of the ith ternary logic gate shown above
@@ -37,10 +43,22 @@ def bin_op(a, b, i):
     elif i == 5:
         return b
     elif i == 6:
-        return 1 - a
+        return torch.abs(0.5-a)
     elif i == 7:
-        return 1 - b
+        return torch.abs(0.5-b)
     elif i == 8:
+        return torch.abs(0.5-a)+0.5
+    elif i == 9:
+        return torch.abs(0.5-b)+0.5
+    elif i == 10:
+        return 1 - a
+    elif i == 11:
+        return 1 - b
+    elif i == 12:
+        return 1- torch.abs(0.5-a)
+    elif i == 13:
+        return 1- torch.abs(0.5-b)
+    elif i == 14:
         return torch.ones_like(a)
 
 #Implements the relaxation form of each ternary logic gate
