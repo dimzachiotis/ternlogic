@@ -17,6 +17,13 @@ class CompiledTernaryPython(torch.nn.Module):
             num_bits=64,
             verbose=False,
     ):
+        
+        """
+        :param model:      GNN model that user wants to test
+        :param device:      device (options: 'cuda' / 'cpu')
+        :param num_bits: bits accuracy (options: 64,32,16,8)
+        :param verbose: if true prints steps
+        """
         super(CompiledTernaryPython, self).__init__()
         self.model = model
         self.device = device
@@ -44,8 +51,8 @@ class CompiledTernaryPython(torch.nn.Module):
                     layers.append((layer.indices[0], layer.indices[1], layer.weights.argmax(1)))
                     #Each LogicLayer defines: indices[0]: Tensor of indices for input A of each neuron, indices[1]: Tensor of indices for input B of each neuron and
                     #weights.argmax(1): chosen Boolean operation 
-                    # In LogicLayer, weights has shape:(num_neurons, 16). The argmax(1) means:
-                    # for each neuron, find the index (gate) of the largest weight across the 16 operations.                
+                    # In LogicLayer, weights has shape:(num_neurons, num_of_gates). The argmax(1) means:
+                    # for each neuron, find the index (gate) of the largest weight across the num_of_gates operations.                
                 elif isinstance(layer, torch.nn.Flatten):
                     if verbose:
                         print('Skipping torch.nn.Flatten layer ({}).'.format(type(layer)))
