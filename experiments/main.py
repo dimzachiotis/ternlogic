@@ -254,7 +254,7 @@ def eval(model, loader, mode):
                 (
                     # Forward pass after ternary quantization
                     # Ternary quantization maps input into:
-                    # {0, 1, 2}
+                    # {-1, 0, 1}
                     lambda q: (model(q).argmax(-1) == y.to(device))
                     .to(torch.float32)
                     .mean()
@@ -262,9 +262,9 @@ def eval(model, loader, mode):
                 )(
                     # Move tensor to computation device and apply ternary thresholding
                     torch.where(
-                    (q := x.to(device)) < 0.5,
-                        0,
-                        torch.where(q > 1.5, 2, 1)
+                    (q := x.to(device)) < -0.5,
+                        -1,
+                        torch.where(q > 0.5, 1, 0)
                     )
                 )
                 for x, y in loader
@@ -441,7 +441,7 @@ if __name__ == '__main__':
                 print(f"Layer {i}: weights shape={weights.shape}, mean={weights.mean():.4f}, std={weights.std():.4f}")
 
         # Save as JSON file (human-readable, can open in any text editor)
-        json_filename = f"./results/trained_weights_{args.experiment_id}_2.json"
+        json_filename = f"./results/trained_weights_{args.experiment_id}_3.json"
         weights_json = {f"layer_{i}": w.tolist() for i, w in enumerate(layer_weights)}
         with open(json_filename, "w") as f:
             json.dump(weights_json, f)
@@ -472,10 +472,10 @@ if __name__ == '__main__':
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
                         #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
                         data = torch.nn.Flatten()(data)
-                        # ternary quantization to {0, 1, 2}
+                        # ternary quantization to {-1, 0, 1}
                         data = torch.where(
-                            data < 0.5,0,
-                            torch.where(data > 1.5, 2, 1))
+                            data < -0.5,-1,
+                            torch.where(data > 0.5, 1, 0))
 
                         #Returns predictions as outputs shape[batch size,number of classes]
                         output = compiled_model.forward(data)
@@ -492,7 +492,7 @@ if __name__ == '__main__':
                     os.makedirs('./results', exist_ok=True)
 
                     # Prepare filename
-                    json_filename = f"./results/{args.experiment_id}_{num_bits}_ternary_2.json"
+                    json_filename = f"./results/{args.experiment_id}_{num_bits}_ternary_3.json"
 
                     # If tern_acc is a tensor, convert it to float
                     if isinstance(tern_acc, torch.Tensor):
