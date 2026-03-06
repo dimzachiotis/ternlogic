@@ -2,26 +2,22 @@ import torch
 import numpy as np
 
 BITS_TO_NP_DTYPE = {8: np.int8, 16: np.int16, 32: np.int32, 64: np.int64}
-number_of_gates=17
-# | id | Operator             | AB=00 | AB=01 | AB=02 | AB=10 | AB=11 | AB=12 | AB=20 | AB=21 | AB=22 |
-# |----|----------------------|-------|-------|-------|-------|-------|-------|-------|-------|-------|
-# | 0  | 0                    | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     | 0     |
-# | 1  | 2 - A                | 2     | 2     | 2     | 1     | 1     | 1     | 0     | 0     | 0     |
-# | 2  | 2 - B                | 2     | 1     | 0     | 2     | 1     | 0     | 2     | 1     | 0     |
-# | 3  | 1                    | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     | 1     |
-# | 4  | A                    | 0     | 0     | 0     | 1     | 1     | 1     | 2     | 2     | 2     |
-# | 5  | B                    | 0     | 1     | 2     | 0     | 1     | 2     | 0     | 1     | 2     |
-# | 6  | |1-A|                | 1     | 1     | 1     | 0     | 0     | 0     | 1     | 1     | 1     |
-# | 7  | |1-B|                | 1     | 0     | 1     | 1     | 0     | 1     | 1     | 0     | 1     |
-# | 8  | |1-A| +1             | 2     | 2     | 2     | 1     | 1     | 1     | 2     | 2     | 2     |
-# | 9  | |1-B| +1             | 2     | 1     | 2     | 2     | 1     | 2     | 2     | 1     | 2     |
-# | 10 | 2-|1-A|              | 1     | 1     | 1     | 2     | 2     | 2     | 1     | 1     | 1     |
-# | 11 | 2-|1-B|              | 1     | 2     | 1     | 1     | 2     | 1     | 1     | 2     | 1     |
-# | 12 | |A-B|                | 0     | 1     | 2     | 1     | 0     | 1     | 2     | 1     | 0     |
-# | 13 | |1-|A-B| |           | 1     | 0     | 1     | 0     | 1     | 0     | 1     | 0     | 1     |
-# | 14 | |1-|A-B| | +1        | 2     | 1     | 2     | 1     | 2     | 1     | 2     | 1     | 2     |
-# | 15 | 2 - |A-B|            | 0     | 1     | 0     | 1     | 2     | 1     | 0     | 1     | 2     |
-# | 16 | 2                    | 2     | 2     | 2     | 2     | 2     | 2     | 2     | 2     | 2     |
+number_of_gates=13
+# | id | Operator             | AB=-1-1 | AB=-10  | AB=-11  | AB=0-1  | AB=00   | AB=01   | AB=1-1  | AB=10   | AB=11   |
+# |----|----------------------|---------|---------|---------|---------|---------|---------|---------|---------|---------|
+# | 0  | -1                   | -1      | -1      | -1      | -1      | -1      | -1      | -1      | -1      | -1      |
+# | 1  | A                    | -1      | -1      | -1      | 0       | 0       | 0       | 1       | 1       | 1       |
+# | 2  | B                    | -1      | 0       | 1       | -1      | 0       | 1       | -1      | 0       | 1       |
+# | 3  | -A                   | 1       | 1       | 1       | 0       | 0       | 0       | -1      | -1      | -1      |
+# | 4  | -B                   | 1       | 0       | -1      | 1       | 0       | -1      | 1       | 0       | -1      |
+# | 5  | A*B                  | 1       | 0       | -1      | 0       | 0       | 0       | -1      | 0       | 1       |
+# | 6  | -A*B                 | -1      | 0       | 1       | 0       | 0       | 0       | 1       | 0       | -1      |
+# | 7  | 0                    | 0       | 0       | 0       | 0       | 0       | 0       | 0       | 0       | 0       |
+# | 8  | A*A                  | 1       | 1       | 1       | 0       | 0       | 0       | 1       | 1       | 1       |
+# | 9  | B*B                  | 1       | 0       | 1       | 1       | 0       | 1       | 1       | 0       | 1       |
+# | 10 | -A*A                 | -1      | -1      | -1      | 0       | 0       | 0       | -1      | -1      | -1      |
+# | 11 | -B*B                 | -1      | 0       | -1      | -1      | 0       | -1      | -1      | 0       | -1      |
+# | 12 | 1                    | 1       | 1       | 1       | 1       | 1       | 1       | 1       | 1       | 1       |
 
 
 
@@ -35,39 +31,31 @@ def bin_op(a, b, i):
     #if a and b have incompatible number of collumns then stop and print their number of their collumns
     #Makes sure a and b have the same size 
     if i == 0:
-        return torch.zeros_like(a)
+        return torch.full_like(a,-1)
     elif i == 1:
-        return 2 - a
-    elif i == 2:
-        return 2 - b
-    elif i == 3:
-        return torch.ones_like(a)
-    elif i == 4:
         return a
-    elif i == 5:
+    elif i == 2:
         return b
+    elif i == 3:
+        return -a
+    elif i == 4:
+        return -b
+    elif i == 5:
+        return a*b
     elif i == 6:
-        return torch.abs(1-a)
+        return -a*b
     elif i == 7:
-        return torch.abs(1-b)
+        return torch.zeros_like(a)
     elif i == 8:
-        return 2-torch.abs(1-a)
+        return a*a
     elif i == 9:
-        return 2-torch.abs(1-b)
+        return b*b
     elif i == 10:
-        return torch.abs(1-a)
+        return -a*a
     elif i == 11:
-        return torch.abs(1-b)
+        return -b*b
     elif i == 12:
-        return torch.abs(a-b)
-    elif i == 13:
-        return torch.abs(1-torch.abs(a-b))
-    elif i == 14:
-        return torch.abs(1-torch.abs(a-b))+1
-    elif i == 15:    
-        return 2 - torch.abs(a-b)
-    elif i == 16:
-        return torch.full_like(a,2)
+        return torch.ones_like(a)
 
 #Implements the relaxation form of each ternary logic gate
 
