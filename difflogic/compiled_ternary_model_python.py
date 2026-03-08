@@ -1,5 +1,5 @@
 import torch
-from .functional import bin_op
+from .functional import tern_op
 from .difflogic import LogicLayer, GroupSum
 
 BITS_TO_DTYPE = {
@@ -50,7 +50,7 @@ class CompiledTernaryPython(torch.nn.Module):
                     self.num_out_per_class = layer.out_dim // self.num_classes
                     layers.append((layer.indices[0], layer.indices[1], layer.weights.argmax(1)))
                     #Each LogicLayer defines: indices[0]: Tensor of indices for input A of each neuron, indices[1]: Tensor of indices for input B of each neuron and
-                    #weights.argmax(1): chosen Boolean operation 
+                    #weights.argmax(1): chosen Ternary operation 
                     # In LogicLayer, weights has shape:(num_neurons, num_of_gates). The argmax(1) means:
                     # for each neuron, find the index (gate) of the largest weight across the 16 operations.                
                 elif isinstance(layer, torch.nn.Flatten):
@@ -105,7 +105,7 @@ class CompiledTernaryPython(torch.nn.Module):
                 #operation of the neuron
                 op = layer_op[i]
                 #applies the operation 
-                layer_vals[:, i] = bin_op(prev_vals[:, a_idx], prev_vals[:, b_idx], op)
+                layer_vals[:, i] = tern_op(prev_vals[:, a_idx], prev_vals[:, b_idx], op)
             #sets layer output to prev_vals
             prev_vals = layer_vals
 
