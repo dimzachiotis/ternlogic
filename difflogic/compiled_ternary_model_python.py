@@ -120,3 +120,19 @@ class CompiledTernaryPython(torch.nn.Module):
 
         return outputs
 
+    def gate_statistics(self):
+        from collections import Counter
+
+        total_stats = Counter()
+        layer_stats = []
+
+        for layer_id, (_, _, layer_op) in enumerate(self.layers):
+            # count gates in this layer
+            layer_counter = Counter(layer_op.tolist())
+
+            layer_stats.append(layer_counter)
+
+            # update total statistics
+            total_stats.update(layer_counter)
+
+        return layer_stats, total_stats
