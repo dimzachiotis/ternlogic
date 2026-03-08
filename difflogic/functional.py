@@ -55,9 +55,9 @@ def bin_op(a, b, i):
     elif i == 9:
         return 2-torch.abs(1-b)
     elif i == 10:
-        return torch.abs(1-a)
+        return torch.abs(1-a)+1
     elif i == 11:
-        return torch.abs(1-b)
+        return torch.abs(1-b)+1
     elif i == 12:
         return torch.abs(a-b)
     elif i == 13:
