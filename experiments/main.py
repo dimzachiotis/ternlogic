@@ -1,4 +1,4 @@
-#This script loads tabular or image datasets, converts data into binary logic features, 
+#This script loads tabular or image datasets, converts data into ternary logic features, 
 #trains a differentiable logic gate network, evaluates in multiple modes and optionally 
 #compiles the trained model to optimized C code
 
