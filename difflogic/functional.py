@@ -23,7 +23,7 @@ number_of_gates=15
 
 
 #This function returns the value of the form of the ith ternary logic gate shown above
-def bin_op(a, b, i):
+def tern_op(a, b, i):
     assert a[0].shape == b[0].shape, (a[0].shape, b[0].shape)
     #if a and b have incompatible number of rows then stop and print their number of their rows
     if a.shape[0] > 1:
@@ -64,10 +64,10 @@ def bin_op(a, b, i):
 #Implements the relaxation form of each ternary logic gate
 
 
-def bin_op_s(a, b, i_s):
+def tern_op_s(a, b, i_s):
     r = torch.zeros_like(a)
     for i in range(number_of_gates):
-        u = bin_op(a, b, i)
+        u = tern_op(a, b, i)
         r = r + i_s[..., i] * u
     return r
 #Apply all ternary logic operations to a and b, weight each result based on i_s[..., i], and sum them

@@ -1,7 +1,7 @@
 import torch
 #import difflogic_cuda
 import numpy as np
-from .functional import bin_op_s, get_unique_connections, GradFactor
+from .functional import tern_op_s, get_unique_connections, GradFactor
 from .packbitstensor import PackBitsTensor
 #   uses modules initialized in files functional.py and packbitstensor.py
 
@@ -116,13 +116,13 @@ class LogicLayer(torch.nn.Module):
 
         #Training mode 
         if self.training:
-            x = bin_op_s(a, b, torch.nn.functional.softmax(self.weights, dim=-1))
+            x = tern_op_s(a, b, torch.nn.functional.softmax(self.weights, dim=-1))
             # i_s is a tensor of shape (outdim)x(number_of_gates) and each row has sum of 1. converts weights into probabilities
             #returns the expected value over all number_of_gates gates (as one gate)
         else:
             #Evaluation Mode , hard logic gates (select one gate over the number_of_gates)
             weights = torch.nn.functional.one_hot(self.weights.argmax(-1), number_of_gates).to(torch.float32)
-            x = bin_op_s(a, b, weights)
+            x = tern_op_s(a, b, weights)
         return x
 
     def forward_cuda(self, x):
