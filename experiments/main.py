@@ -457,6 +457,32 @@ if __name__ == '__main__':
 
                     print(f"python_acc saved as JSON: {json_filename}") 
 
+        layer_stats, total_stats = compiled_model.gate_statistics()
+
+        # Sort dictionary in decreasing order
+        def sort_desc_dict(d):
+            return dict(sorted(d.items(), key=lambda x: x[1], reverse=True))
+
+        gate_stats_data = {
+            "layers": [
+                {
+                    "layer": i,
+                    "gates": sort_desc_dict(stats)
+                }
+                for i, stats in enumerate(layer_stats)
+            ],
+            "total": sort_desc_dict(total_stats)
+        }
+
+        # Save JSON
+        os.makedirs('./results', exist_ok=True)
+
+        json_filename = f"./results/{args.experiment_id}_gate_stats_bin.json"
+
+        with open(json_filename, "w") as f:
+            json.dump(gate_stats_data, f, indent=4)
+
+
     ####################################################################################################################
 
     # #Model C Compilation (Optional)

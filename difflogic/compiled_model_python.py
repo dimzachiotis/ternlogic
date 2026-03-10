@@ -96,4 +96,22 @@ class CompiledPython(torch.nn.Module):
             outputs[:, c] = prev_vals[:, c*neurons_per_class:(c+1)*neurons_per_class].sum(dim=1)
 
         return outputs
+    
+    def gate_statistics(self):
+        from collections import Counter
+
+        total_stats = Counter()
+        layer_stats = []
+
+        for layer_id, (_, _, layer_op) in enumerate(self.layers):
+            # count gates in this layer
+            layer_counter = Counter(layer_op.tolist())
+
+            layer_stats.append(layer_counter)
+
+            # update total statistics
+            total_stats.update(layer_counter)
+
+        return layer_stats, total_stats
+
 
