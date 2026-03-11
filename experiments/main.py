@@ -176,17 +176,17 @@ def get_model(args):
     if arch == 'randomly_connected':
         logic_layers.append(torch.nn.Flatten())
         #Flattens input and appends it to list
-        logic_layers.append(LogicLayer(in_dim=in_dim, out_dim=k, **llkw))
+        logic_layers.append(LogicLayer(in_dim=in_dim, out_dim=k, **llkw, device=device))
         #First logic layer
 
         #Adds hidden layers
         for _ in range(l - 1):
-            logic_layers.append(LogicLayer(in_dim=k, out_dim=k, **llkw))
+            logic_layers.append(LogicLayer(in_dim=k, out_dim=k, **llkw, device=device))
 
         #Wraps layers into a single model
         model = torch.nn.Sequential(
             *logic_layers,
-            GroupSum(class_count, args.tau)
+            GroupSum(class_count, args.tau, device=device)
         )
         #GroupSum is the output layer with class_count classes and t=args.tau
 
@@ -465,7 +465,8 @@ if __name__ == '__main__':
                 compiled_model = CompiledTernaryPython(
                 model=model,
                 verbose=False,
-                num_bits=num_bits
+                num_bits=num_bits, 
+                device=device
                 )
 
                 correct, total = 0, 0
