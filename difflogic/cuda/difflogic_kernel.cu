@@ -109,7 +109,7 @@ static inline __device__ double gpuAtomicAdd(double *address, double val) { retu
 /**  TRAINING MODE  ***************************************************************************************************/
 /**********************************************************************************************************************/
 
-//it implements the cuda forward pass of a LogicLayer object
+//it implements the cuda forward pass of a LogicLayer
 template <typename scalar_t>
 __global__ void logic_layer_cuda_forward_kernel(
     torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
