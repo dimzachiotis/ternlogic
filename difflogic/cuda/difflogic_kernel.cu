@@ -1,22 +1,37 @@
 #include <torch/extension.h>
+//Includes PyTorch C++ API for building extensions
 
 #include <c10/util/Half.h>
+//Provides PyTorch half-precision utilities.
 #include <cuda.h>
 #include <cuda_runtime.h>
+//CUDA driver/runtime APIs for GPU programming.
 
 #include <array>
 #include <cmath>
 #include <vector>
+//Standard C++ utilities
 
 #define BACKWARD_W_BATCH_THREADS 32
+//defines a constant named BACKWARD_W_BATCH_THREADS
+
+///////////////////////////////
+//////defines functions////////
+///////////////////////////////
 
 #define CHECK_CUDA(x) TORCH_CHECK(x.type().is_cuda(), #x " must be a CUDA tensor")
+//Ensures tensor is on GPU
+
 #define CHECK_CONTIGUOUS(x) TORCH_CHECK(x.is_contiguous(), #x " must be contiguous")
+//Ensures memory layout is contiguous (CUDA kernels assume this)
+
+//Used at the start of every exposed function
 #define CHECK_INPUT(x)                                                                                                 \
     CHECK_CUDA(x);                                                                                                     \
     CHECK_CONTIGUOUS(x)
 
 // adapted from https://stackoverflow.com/questions/14038589/what-is-the-canonical-way-to-check-for-errors-using-the-cuda-runtime-api
+//CUDA error checking
 #define gpuErrchk(ans)                                                                                                 \
     { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(const cudaError_t code, const char *const file, const int line, const bool abort = true) {
@@ -26,7 +41,9 @@ inline void gpuAssert(const cudaError_t code, const char *const file, const int 
             exit(code);
     }
 }
+//if a CUDA call fails -> GPUassert: <error> <file> <line> -> then exits. (Critical for debugging kernels)
 
+//ceiling division
 template <typename T> T ceil_div(const T x, const T y) { return x / y + !!(x % y); }
 
 
@@ -35,7 +52,12 @@ template <typename T> T ceil_div(const T x, const T y) { return x / y + !!(x % y
 
 template <typename T> struct AtomicFPOp;
 
+//Atomic func: special operation used in parallel programming (CPU/GPU) that manipulates a variable safely when multiple threads are accessing it at the same time.
+//Atomic func for half precision, because cuda does not provide it
+//Use this implementation when the type T is at::Half.
 template <> struct AtomicFPOp<at::Half> {
+    //call it like: AtomicFPOp<at::Half>()(ptr, value, func);
+    //it applies a generic operation func 
     template <typename func_t> inline __device__ at::Half operator()(at::Half *address, at::Half val, const func_t &func) {
         unsigned int *address_as_ui = (unsigned int *)((char *)address - ((size_t)address & 2));
         unsigned int old = *address_as_ui;
@@ -54,6 +76,7 @@ template <> struct AtomicFPOp<at::Half> {
     }
 };
 
+//gpuAtomicAdd is a portable atomic addition helper for GPU kernels
 static inline __device__ at::Half gpuAtomicAdd(at::Half *address, at::Half val) {
 #if defined(USE_ROCM) || ((defined(CUDA_VERSION) && CUDA_VERSION < 10000) || (defined(__CUDA_ARCH__) && (__CUDA_ARCH__ < 700)))
 
@@ -74,7 +97,7 @@ static inline __device__ at::Half gpuAtomicAdd(at::Half *address, at::Half val) 
     return atomicAdd(reinterpret_cast<__half *>(address), val);
 #endif
 }
-
+//Those lines exist mainly for API consistency and overloading, so the same function name (gpuAtomicAdd) can be used for different numeric types.
 static inline __device__ float gpuAtomicAdd(float *address, float val) { return atomicAdd(address, val); }
 
 static inline __device__ double gpuAtomicAdd(double *address, double val) { return atomicAdd(address, val); }
@@ -86,7 +109,7 @@ static inline __device__ double gpuAtomicAdd(double *address, double val) { retu
 /**  TRAINING MODE  ***************************************************************************************************/
 /**********************************************************************************************************************/
 
-
+//it implements the cuda forward pass of a LogicLayer object
 template <typename scalar_t>
 __global__ void logic_layer_cuda_forward_kernel(
     torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
