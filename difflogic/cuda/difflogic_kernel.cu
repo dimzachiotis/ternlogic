@@ -12,6 +12,7 @@
 #include <vector>
 //Standard C++ utilities
 
+//On NVIDIA GPUs, threads are executed in warps of 32
 #define BACKWARD_W_BATCH_THREADS 32
 //defines a constant named BACKWARD_W_BATCH_THREADS
 
@@ -110,6 +111,8 @@ static inline __device__ double gpuAtomicAdd(double *address, double val) { retu
 /**********************************************************************************************************************/
 
 //it implements the cuda forward pass of a LogicLayer
+//__global__ → this is a CUDA kernel that runs on the GPU and is launched from CPU code
+//this function, behaves the same as bin_op_s
 template <typename scalar_t>
 __global__ void logic_layer_cuda_forward_kernel(
     torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
@@ -117,9 +120,15 @@ __global__ void logic_layer_cuda_forward_kernel(
     torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
     torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> w,
     torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> y
-) {
+) { //Inputs
+    //x : [num_inputs, batch]
+    //a : [num_neurons]
+    //b : [num_neurons]
+    //w : [num_neurons, 16]
+    //Output
+    //y : [num_neurons, batch]
 
-    for (  // batch dim
+    for (  // batch dim, 
         auto row = blockIdx.x * blockDim.x + threadIdx.x;
         row < y.size(1);
         row += blockDim.x * gridDim.x
@@ -129,14 +138,16 @@ __global__ void logic_layer_cuda_forward_kernel(
             col < y.size(0);
             col += blockDim.y * gridDim.y
         ) {
-
+            //indexes
             const auto idx_a = a[col];
             const auto idx_b = b[col];
+            //Values based on indexes
             const auto a_ = x[idx_a][row];
             const auto b_ = x[idx_b][row];
-
+            //w_=[1x16]
             const auto w_ = w[col];
 
+            //y[col][row] = weighted sum of logical functions of (a_, b_)
             y[col][row] = (
                  ((w_[1] * (a_ * b_)
                  + w_[2] * (a_ - a_ * b_))
@@ -157,7 +168,7 @@ __global__ void logic_layer_cuda_forward_kernel(
     }}
 }
 
-
+//Computes the dL/dw
 template <typename scalar_t>
 __global__ void
 logic_layer_cuda_backward_w_kernel(
@@ -185,7 +196,7 @@ logic_layer_cuda_backward_w_kernel(
             const auto a_ = x[idx_a][row];
             const auto b_ = x[idx_b][row];
             const auto grad_y_ = grad_y[col][row];
-
+            //its not the anaytical gradient. Computes the structural gradients that form the total.
             // compute grad_w
             grad_w_local_1 += (a_ * b_) * grad_y_;
             grad_w_local_3 += a_ * grad_y_;
@@ -200,7 +211,11 @@ logic_layer_cuda_backward_w_kernel(
     }
 }
 
-
+//computes the dL/dx
+//When col == idx_a, we compute ∂y/∂a.
+//When col == idx_b, we compute ∂y/∂b.
+//given_x_indices_of_y → flat list of all neurons depending on each input
+//given_x_indices_of_y_start → start index of each input’s neurons in the flat list
 template <typename scalar_t>
 __global__ void
 logic_layer_cuda_backward_x_kernel(
@@ -238,6 +253,7 @@ logic_layer_cuda_backward_x_kernel(
                 const auto idx_is_a = idx_a == col;
 
                 // compute grad_x
+                //derivate with respect to a
                 if (idx_is_a) {
                     const auto b_ = x[idx_b][row];
                     const auto dy_dx = (
@@ -255,6 +271,7 @@ logic_layer_cuda_backward_x_kernel(
                        + w[idx_y][14] * -b_)
                     );
                     grad_x_ += dy_dx * grad_y_;
+                //derivate with respect to b
                 } else {
                     const auto a_ = x[idx_a][row];
                     const auto dy_dx = (
@@ -278,13 +295,15 @@ logic_layer_cuda_backward_x_kernel(
     }}
 }
 
-
+//PyTorch CUDA wrapper for logic layer’s forward pass. 
+//It handles tensor preparation, launching the CUDA kernel, and returning the output.
 torch::Tensor logic_layer_cuda_forward(
     torch::Tensor x,
     torch::Tensor a,
     torch::Tensor b,
     torch::Tensor w
 ) {
+    //inputs check
     CHECK_INPUT(x);
     CHECK_INPUT(a);
     CHECK_INPUT(b);
@@ -294,15 +313,19 @@ torch::Tensor logic_layer_cuda_forward(
     const auto in_size = x.size(0);
     const auto out_size = w.size(0);
 
+    //Allocates memory for the forward output
     auto y = torch::empty({out_size, batch_size}, torch::dtype(x.dtype()).device(x.device()));
 
+    //2D thread block: 32 × 32 threads per block
     dim3 threads_per_block(32, 32);
 
+    //65535 blocks per dimension
     const dim3 blocks_per_grid(
         min(static_cast<int64_t>(65535), ceil_div(batch_size, static_cast<int64_t>(threads_per_block.x))),
         min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
     );
 
+    //Launch the CUDA Kernel
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.type(), "logic_layer_cuda_forward", ([&] {
                            logic_layer_cuda_forward_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                x.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
@@ -313,19 +336,21 @@ torch::Tensor logic_layer_cuda_forward(
                            );
                        }));
 
+    //Checks for kernel launch errors and Synchronizes the device to make sure kernel finishes
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
     return y;
 }
 
-
+//PyTorch CUDA wrapper for logic layer’s backward pass. dL/dw 
 torch::Tensor logic_layer_cuda_backward_w(
     torch::Tensor x,
     torch::Tensor a,
     torch::Tensor b,
     torch::Tensor grad_y
 ) {
+    //inputs check
     CHECK_INPUT(x);
     CHECK_INPUT(a);
     CHECK_INPUT(b);
@@ -336,6 +361,7 @@ torch::Tensor logic_layer_cuda_backward_w(
     const auto in_size = x.size(0);
     const auto out_size = grad_y.size(0);
 
+    //Holds per-thread partial sums of the 4 independent gradients. Shape: [neurons, threads_per_block, 4]
     auto grad_w_4 = torch::empty({out_size, BACKWARD_W_BATCH_THREADS, 4}, torch::dtype(x.dtype()).device(x.device()));
 
     dim3 threads_per_block(BACKWARD_W_BATCH_THREADS, 1024 / BACKWARD_W_BATCH_THREADS);
@@ -344,7 +370,7 @@ torch::Tensor logic_layer_cuda_backward_w(
         1,
         min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
     );
-
+    //Launch CUDA Kernel
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.type(), "logic_layer_cuda_backward_w", ([&] {
                            logic_layer_cuda_backward_w_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                x.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
@@ -357,36 +383,43 @@ torch::Tensor logic_layer_cuda_backward_w(
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
+    //Sums over BACKWARD_W_BATCH_THREADS to get full batch accumulation
+    //Shape becomes [out_size, 4]
     const auto grad_w_components = grad_w_4.sum(1);
+    //Then each component is extracted
     const auto grad_w_ab = grad_w_components.index({torch::indexing::Slice(), 0});
     const auto grad_w_a = grad_w_components.index({torch::indexing::Slice(), 1});
     const auto grad_w_b = grad_w_components.index({torch::indexing::Slice(), 2});
     const auto grad_w_ = grad_w_components.index({torch::indexing::Slice(), 3});
 
+    //The logic layer uses 16 weights but only 4 independent gradients are computed (AB, A, B, 1).
+    //All other weights are linear combinations of these 4 basis gradients.
+    //The reconstruction is done with torch::stack:
+    //Shape: [out_size, 16]
     const auto grad_w = torch::stack({
-        torch::zeros({out_size}, torch::dtype(x.dtype()).device(x.device())),
-        grad_w_ab,
-        grad_w_a - grad_w_ab,
-        grad_w_a,
-        grad_w_b - grad_w_ab,
-        grad_w_b,
-        grad_w_a + grad_w_b - grad_w_ab - grad_w_ab,
-        grad_w_a + grad_w_b - grad_w_ab,
-        grad_w_ - grad_w_a - grad_w_b + grad_w_ab,
-        grad_w_ - grad_w_a - grad_w_b + grad_w_ab + grad_w_ab,
-        grad_w_ - grad_w_b,
-        grad_w_ - grad_w_b + grad_w_ab,
-        grad_w_ - grad_w_a,
-        grad_w_ - grad_w_a + grad_w_ab,
-        grad_w_ - grad_w_ab,
-        grad_w_,
+        torch::zeros({out_size}, torch::dtype(x.dtype()).device(x.device())),// w0 not used
+        grad_w_ab,  // w1 = AB
+        grad_w_a - grad_w_ab, // w2 = A - AB
+        grad_w_a,// w3 = A
+        grad_w_b - grad_w_ab,// w4 = B - AB
+        grad_w_b,// w5 = B
+        grad_w_a + grad_w_b - grad_w_ab - grad_w_ab,// w6 = A + B - 2AB
+        grad_w_a + grad_w_b - grad_w_ab,// w7 = A + B - AB
+        grad_w_ - grad_w_a - grad_w_b + grad_w_ab,// w8 = 1 - A - B + AB
+        grad_w_ - grad_w_a - grad_w_b + grad_w_ab + grad_w_ab,// w9 = 1 - A - B + 2AB
+        grad_w_ - grad_w_b, // w10 = 1 - B
+        grad_w_ - grad_w_b + grad_w_ab,// w11 = 1 - B + AB
+        grad_w_ - grad_w_a,// w12 = 1 - A
+        grad_w_ - grad_w_a + grad_w_ab,// w13 = 1 - A + AB
+        grad_w_ - grad_w_ab,// w14 = 1 - AB
+        grad_w_,// w15 = bias
     }, 1);
 
 
     return grad_w;
 }
 
-
+//PyTorch CUDA wrapper for logic layer’s backward pass. dL/dx 
 torch::Tensor logic_layer_cuda_backward_x(
     torch::Tensor x,
     torch::Tensor a,
@@ -396,6 +429,7 @@ torch::Tensor logic_layer_cuda_backward_x(
     torch::Tensor given_x_indices_of_y_start,
     torch::Tensor given_x_indices_of_y
 ) {
+    //inputs check
     CHECK_INPUT(x);
     CHECK_INPUT(a);
     CHECK_INPUT(b);
@@ -412,7 +446,8 @@ torch::Tensor logic_layer_cuda_backward_x(
         min(static_cast<int64_t>(65535), ceil_div(x.size(1), static_cast<int64_t>(threads_per_block.x))),
         min(static_cast<int64_t>(65535), ceil_div(x.size(0), static_cast<int64_t>(threads_per_block.y)))
     );
-
+    //Launch CUDA Kernel
+    //the last two arguments describe which neurons depend on each input (Instead of checking all neurons, the kernel only loops over relevant ones)
     AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.type(), "logic_layer_cuda_backward_x", ([&] {
                            logic_layer_cuda_backward_x_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                x.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
@@ -529,6 +564,7 @@ torch::Tensor logic_layer_cuda_eval(
     torch::Tensor b,
     torch::Tensor w
 ) {
+    //inputs check
     CHECK_INPUT(x);
     CHECK_INPUT(a);
     CHECK_INPUT(b);
@@ -607,6 +643,7 @@ std::tuple<torch::Tensor, int> tensor_packbits_cuda(
     torch::Tensor t,
     const int bit_count
 ) {
+    //input check
     CHECK_INPUT(t);
 
     const auto batch_in_size = t.size(1);
@@ -691,6 +728,7 @@ torch::Tensor groupbitsum(
     const int pad_len,
     const int k
 ) {
+    //input check
     CHECK_INPUT(b);
 
     const int bit_count = 8 * b.element_size();
