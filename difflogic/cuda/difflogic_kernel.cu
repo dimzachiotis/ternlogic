@@ -492,6 +492,7 @@ torch::Tensor logic_layer_cuda_backward_x(
 // | 14 | not(A and B)         | 1     | 1     | 1     | 0     |
 // | 15 | 1                    | 1     | 1     | 1     | 1     |
 
+//returns the result of one of 16 binary logic operations depending on op_idx
 template <typename T> __device__ __forceinline__ T bin_op_eval(const T a_, const T b_, const int op_idx) {
     switch (op_idx) {
     case 0:
@@ -529,6 +530,9 @@ template <typename T> __device__ __forceinline__ T bin_op_eval(const T a_, const
     }
 }
 
+//The Evaluation Kernel
+//Here w is uint8_t, not float weights.(operation index (0-15))
+//That means each neuron stores just the index of the chosen logic gate.
 template <typename scalar_t>
 __global__ void logic_layer_cuda_eval_kernel(
     torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
@@ -553,11 +557,12 @@ __global__ void logic_layer_cuda_eval_kernel(
             const auto a_ = x[idx_a][row];
             const auto b_ = x[idx_b][row];
             const auto w_ = w[col];
+            //applies one logic operation per neuron
             y[col][row] = bin_op_eval(a_, b_, w_);
         }
     }
 }
-
+//PyTorch CUDA wrapper for logic layer’s evaluation
 torch::Tensor logic_layer_cuda_eval(
     torch::Tensor x,
     torch::Tensor a,
@@ -574,6 +579,7 @@ torch::Tensor logic_layer_cuda_eval(
     const auto in_size = x.size(0);
     const auto out_size = w.size(0);
 
+    //Creates the output tensor filled with 0
     auto y = torch::zeros({out_size, batch_size}, torch::dtype(x.dtype()).device(x.device()));
 
     dim3 threads_per_block(32, 32);
@@ -583,6 +589,8 @@ torch::Tensor logic_layer_cuda_eval(
         min(static_cast<int64_t>(65535), ceil_div(x.size(0), static_cast<int64_t>(threads_per_block.y)))
     );
 
+    //Dispatch for Integer Types.
+    //Unlike training kernels (which used floating types), this kernel expects integer inputs, because it uses bitwise logic operations.
     AT_DISPATCH_INTEGRAL_TYPES(x.type(), "logic_layer_cuda_eval_kernel", ([&] {
                                    logic_layer_cuda_eval_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                        x.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
