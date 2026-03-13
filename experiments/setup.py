@@ -16,3 +16,5 @@ setup(
         "build_ext": BuildExtension
     }
 )
+
+#run the command : python setup.py build_ext --inplace
