@@ -610,7 +610,12 @@ torch::Tensor logic_layer_cuda_eval(
 
 /**********************************************************************************************************************/
 
-
+//This kernel packs boolean values into the bits of an integer
+//t : [neurons, batch_in]
+//b : [neurons, batch_out]
+//batch_out = ceil(batch_in / bit_count)
+//Even though bool tensor stores bool, on GPUs (and CPUs) a boolean element usually occupies 1 byte, not 1 bit. 
+//we use less memory by packing
 template <typename scalar_t>
 __global__ void tensor_packbits_cuda_kernel(
     torch::PackedTensorAccessor32<bool, 2, torch::RestrictPtrTraits> t,
@@ -628,11 +633,14 @@ __global__ void tensor_packbits_cuda_kernel(
             col += blockDim.x * gridDim.x
         ) {
 
+            //Convert Integer Type to Unsigned (bit operations behave correctly only on unsigned integers)
             typedef typename std::make_unsigned<scalar_t>::type unsigned_scalar_t;
+            //A union shares memory between variables.
             union {
                 unsigned_scalar_t unsigned_scalar;
                 scalar_t signed_scalar;
             } val;
+            //Determine Bit Capacity
             constexpr int bit_count = std::numeric_limits<unsigned_scalar_t>::digits;
             val.signed_scalar = b[row][col];
             for (unsigned int i = 0; i < bit_count; ++i) {
@@ -647,6 +655,8 @@ __global__ void tensor_packbits_cuda_kernel(
     }
 }
 
+//PyTorch CUDA wrapper for tensor_packbits
+//batch_out = ceil(batch_in / bit_count)
 std::tuple<torch::Tensor, int> tensor_packbits_cuda(
     torch::Tensor t,
     const int bit_count
@@ -655,8 +665,10 @@ std::tuple<torch::Tensor, int> tensor_packbits_cuda(
     CHECK_INPUT(t);
 
     const auto batch_in_size = t.size(1);
+    //Packed batch size
     const auto batch_out_size = ceil_div(batch_in_size, static_cast<int64_t>(bit_count));
     const auto out_size = t.size(0);
+    //Padding length
     const auto pad_len = (bit_count - batch_in_size % bit_count) % bit_count;
 
     dim3 threads_per_block(32, 32);
@@ -666,6 +678,7 @@ std::tuple<torch::Tensor, int> tensor_packbits_cuda(
         min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
     );
 
+    //Choose integer type
     auto dispatch_type = [bit_count]() {
         switch (bit_count) {
         case 8:
@@ -680,6 +693,7 @@ std::tuple<torch::Tensor, int> tensor_packbits_cuda(
             throw std::invalid_argument("`bit_count` has to be in { 8, 16, 32, 64 }");
         }
     }();
+    //Allocate output tensor
     auto b = torch::zeros({out_size, batch_out_size}, torch::dtype(dispatch_type).device(t.device()));
 
     AT_DISPATCH_INTEGRAL_TYPES(b.type(), "tensor_packbits_cuda_kernel", ([&] {
@@ -695,7 +709,11 @@ std::tuple<torch::Tensor, int> tensor_packbits_cuda(
 
 /**********************************************************************************************************************/
 
-
+//This kernel reads bits from packed integers and counts them per class.
+//b : packed bit tensor, shape = [neurons, packed_batch]
+//t : integer tensor, shape = [classes, batch]
+//Without packing: neurons × batch, ex: 512 neurons × 1024 samples
+//With packing: 512 × 16 integers. Much smaller memory and fewer operations.
 template <typename scalar_t>
 __global__ void groupbitsum_kernel(
     torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> b,
@@ -713,24 +731,30 @@ __global__ void groupbitsum_kernel(
             col += blockDim.x * gridDim.x
         ) {
 
+            //Convert to Unsigned Type
             typedef typename std::make_unsigned<scalar_t>::type unsigned_scalar_t;
+            //Union Trick
             union scalar_t_ {
                 unsigned_scalar_t unsigned_scalar;
                 scalar_t signed_scalar;
             };
+            //Determine Bit Capacity
             constexpr int bit_count = std::numeric_limits<unsigned_scalar_t>::digits;
             int res = 0;
+            //Neurons Per Class
             const auto class_size = b.size(0) / t.size(0);
             for (int i = 0; i < class_size; ++i) {
+                //Read Packed Integer
                 const scalar_t_ val = {.signed_scalar = b[row * class_size + i][col / bit_count]};
                 const unsigned_scalar_t bit_mask = static_cast<unsigned_scalar_t>(1) << static_cast<uint32_t>(col % bit_count);
+                //Convert to boolean and add to count
                 res += !!(val.unsigned_scalar & bit_mask);
             }
             t[row][col] = res;
         }
     }
 }
-
+//PyTorch CUDA wrapper for groupbitsum_kernel
 torch::Tensor groupbitsum(
     torch::Tensor b,
     const int pad_len,
@@ -739,10 +763,12 @@ torch::Tensor groupbitsum(
     //input check
     CHECK_INPUT(b);
 
+    //Determine Bit Size
     const int bit_count = 8 * b.element_size();
 
     const auto batch_in_size = b.size(1);
     const auto in_size = b.size(0);
+    //Recover Original Batch Size
     const auto batch_out_size = batch_in_size * bit_count - pad_len;
     const auto out_size = static_cast<int64_t>(k);
     assert(in_size % k == 0);
@@ -754,8 +780,10 @@ torch::Tensor groupbitsum(
         min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
     );
 
+    //Allocate Output Tensor
     auto t = torch::zeros({out_size, batch_out_size}, torch::dtype(torch::kInt32).device(b.device()));
 
+    //Kernel Dispatch
     AT_DISPATCH_INTEGRAL_TYPES(b.type(), "groupbitsum_kernel", ([&] {
                                    groupbitsum_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                         b.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
@@ -765,6 +793,7 @@ torch::Tensor groupbitsum(
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
+    //Transpose Output. Before transpose: t shape = [classes, batch], After transpose:[batch, classes]
     return t.transpose(0, 1).contiguous();
 }
 
