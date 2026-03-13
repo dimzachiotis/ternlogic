@@ -1,10 +1,13 @@
+//This file is the bridge between Python (PyTorch) and CUDA/C++ kernels.
+//It uses PyBind11 and PyTorch to expose CUDA functions so they can be called directly from Python.
 #include <pybind11/numpy.h>
 #include <torch/extension.h>
 #include <vector>
 
 
 namespace py = pybind11;
-
+//Function Declarations
+//These tell the compiler that the implementations exist somewhere else (likely .cu files).
 torch::Tensor logic_layer_cuda_forward(
     torch::Tensor x,
     torch::Tensor a,
@@ -42,8 +45,10 @@ torch::Tensor groupbitsum(
     const int k
 );
 
+//Module Creation
+//This creates a Python module.
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
-    m.def(
+    m.def( 
         "forward",
         [](torch::Tensor x, torch::Tensor a, torch::Tensor b, torch::Tensor w) {
             return logic_layer_cuda_forward(x, a, b, w);
