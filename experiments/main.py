@@ -1,7 +1,7 @@
 #This script loads tabular or image datasets, converts data into ternary logic features, 
 #trains a differentiable logic gate network, evaluates in multiple modes and optionally 
 #compiles the trained model to optimized Python code
-
+import mlflow
 import argparse
 import math
 import random
@@ -342,10 +342,19 @@ if __name__ == '__main__':
     parser.add_argument('--grad-factor', type=float, default=1.)
 
     args = parser.parse_args()
+
+    #Start an MLflow run
+    ####################################################################################################################
+
+    mlflow.set_experiment("ternlogic")
+    mlflow.start_run()
+    
     #creates arg object
     ####################################################################################################################
 
     print(vars(args))
+    #This logs all CLI parameters automatically.
+    mlflow.log_params(vars(args))
 
     assert args.num_iterations % args.eval_freq == 0, (
         f'iteration count ({args.num_iterations}) has to be divisible by evaluation frequency ({args.eval_freq})'
@@ -404,6 +413,9 @@ if __name__ == '__main__':
                 'test_acc_train_mode': test_accuracy_train_mode,
                 'loss': loss_value,
             }
+
+            #Log training metrics
+            mlflow.log_metrics(r, step=i)
 
             if args.packbits_eval:
                 r['train_acc_eval'] = packbits_eval(model, train_loader)
@@ -534,4 +546,5 @@ if __name__ == '__main__':
 
         with open(json_filename, "w") as f:
             json.dump(gate_stats_data, f, indent=4)
-
+#End the run
+mlflow.end_run()
