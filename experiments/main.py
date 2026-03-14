@@ -347,7 +347,8 @@ if __name__ == '__main__':
     ####################################################################################################################
 
     mlflow.set_experiment("ternlogic")
-    mlflow.start_run()
+    #Gives your run a readable name.
+    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}")
     
     #creates arg object
     ####################################################################################################################
@@ -500,6 +501,8 @@ if __name__ == '__main__':
                 #Accuracy of compiled model
                 tern_acc = correct / total
                 print('COMPILED PYTHON MODEL', num_bits , tern_acc)
+
+                mlflow.log_metric(f"{args.experiment_id}_{num_bits}_tern_testing_acc_3", tern_acc)
 
                 #Store Accuracy of python compilation
                 if args.experiment_id is not None:
