@@ -27,7 +27,7 @@ if top_level_dir not in sys.path:
 #it doesnt see difflogic.py file, so this fixes it
 
 from difflogic.difflogic import LogicLayer, GroupSum
-from difflogic.packbitstensor import PackBitsTensor
+from difflogic.packbitstensor import PackTernaryTensor
 from difflogic.compiled_model import CompiledLogicNet
 from difflogic.compiled_ternary_model_python import CompiledTernaryPython
 
@@ -278,19 +278,34 @@ def eval(model, loader, mode):
 
 
 #in case you want to use cuda in the future you have to change this function so it follows ternary logic (delete .bool)
-def packbits_eval(model, loader):
+def packtern_eval(model, loader):
     orig_mode = model.training
     with torch.no_grad():
         model.eval()
         res = np.mean(
             [
-                (model(PackBitsTensor(x.to(device).reshape(x.shape[0], -1).round().bool())).argmax(-1) == y.to(
-                    device)).to(torch.float32).mean().item()
+                (
+                    model(
+                        PackTernaryTensor(
+                            # Convert input to hard ternary values {-1,0,1}
+                            torch.where(
+                                (q := x.to(device).reshape(x.shape[0], -1)) < -0.5,
+                                -1,
+                                torch.where(q > 0.5, 1, 0)
+                            ),
+                            num_gates=model.num_gates,  # must match your model's gate count
+                            device='cuda'
+                        )
+                    ).argmax(-1) == y.to(device)
+                )
+                .to(torch.float32)
+                .mean()
+                .item()
                 for x, y in loader
             ]
         )
         model.train(mode=orig_mode)
-    return res.item()
+    return res
 
 #Main script - Example usage
 #IMPORTANT
@@ -324,7 +339,7 @@ if __name__ == '__main__':
                         help='`cuda` is the fast CUDA implementation and `python` is simpler but much slower '
                         'implementation intended for helping with the understanding.')
 
-    parser.add_argument('--packbits_eval', action='store_true', help='Use the PackBitsTensor implementation for an '
+    parser.add_argument('--packtern_eval', action='store_true', help='Use the PackTernaryTensor implementation for an '
                                                                      'additional eval step.')
     parser.add_argument('--compile_model', action='store_true', help='Compile the final model with C for CPU.')
 
@@ -418,10 +433,10 @@ if __name__ == '__main__':
             #Log training metrics
             mlflow.log_metrics(r, step=i)
 
-            if args.packbits_eval:
-                r['train_acc_eval'] = packbits_eval(model, train_loader)
-                r['valid_acc_eval'] = packbits_eval(model, train_loader)
-                r['test_acc_eval'] = packbits_eval(model, test_loader)
+            if args.packtern_eval:
+                r['train_acc_eval'] = packtern_eval(model, train_loader)
+                r['valid_acc_eval'] = packtern_eval(model, train_loader)
+                r['test_acc_eval'] = packtern_eval(model, test_loader)
 
             if args.experiment_id is not None:
                 results.store_results(r)
