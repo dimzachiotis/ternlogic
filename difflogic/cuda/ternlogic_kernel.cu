@@ -124,7 +124,7 @@ __global__ void logic_layer_cuda_forward_kernel(
     //x : [num_inputs, batch]
     //a : [num_neurons]
     //b : [num_neurons]
-    //w : [num_neurons, 16]
+    //w : [num_neurons, nuber_of_gates]
     //Output
     //y : [num_neurons, batch]
 
@@ -144,27 +144,27 @@ __global__ void logic_layer_cuda_forward_kernel(
             //Values based on indexes
             const auto a_ = x[idx_a][row];
             const auto b_ = x[idx_b][row];
-            //w_=[1x16]
+            
+            // ===============================================================
+            // CHANGED: ternary polynomial basis instead of binary logic basis
+            // ===============================================================
+
             const auto w_ = w[col];
 
-            //y[col][row] = weighted sum of logical functions of (a_, b_)
-            y[col][row] = (
-                 ((w_[1] * (a_ * b_)
-                 + w_[2] * (a_ - a_ * b_))
-                + (w_[3] * a_
-                 + w_[4] * (b_ - a_ * b_)))
-               + ((w_[5] * b_
-                 + w_[6] * (a_ + b_ - static_cast<scalar_t>(2) * a_ * b_))
-                + (w_[7] * (a_ + b_ - a_ * b_)
-                 + w_[8] * (static_cast<scalar_t>(1) - (a_ + b_ - a_ * b_)))))
-              + (((w_[9] * (static_cast<scalar_t>(1) - (a_ + b_ - static_cast<scalar_t>(2) * a_ * b_))
-                 + w_[10] * (static_cast<scalar_t>(1) - b_)) +
-                  (w_[11] * (static_cast<scalar_t>(1) - b_ + a_ * b_)
-                 + w_[12] * (static_cast<scalar_t>(1) - a_))) +
-                  (w_[13] * (static_cast<scalar_t>(1) - a_ + a_ * b_)
-                 + w_[14] * (static_cast<scalar_t>(1) - a_ * b_)
-                 + w_[15])
-            );
+            y[col][row] =
+                w_[0]                                       // -1
+                + w_[1] * a_                                  // A
+                + w_[2] * b_                                  // B
+                + w_[3] * (-a_)                               // -A
+                + w_[4] * (-b_)                               // -B
+                + w_[5] * (a_ * b_)                           // AB
+                + w_[6] * (-a_ * b_)                          // -AB
+                + w_[7] * static_cast<scalar_t>(0)             // 0
+                + w_[8] * (a_ * a_)                           // A²
+                + w_[9] * (b_ * b_)                           // B²
+                + w_[10] * (-a_ * a_)                         // -A²
+                + w_[11] * (-b_ * b_)                         // -B²
+                + w_[12] * static_cast<scalar_t>(1);          // 1
     }}
 }
 
@@ -188,26 +188,32 @@ logic_layer_cuda_backward_w_kernel(
     ) {
         const auto idx_a = a[col];
         const auto idx_b = b[col];
-        scalar_t grad_w_local_1 = 0;
-        scalar_t grad_w_local_3 = 0;
-        scalar_t grad_w_local_5 = 0;
-        scalar_t grad_w_local_15 = 0;
+        scalar_t grad_w_a  = 0;
+        scalar_t grad_w_b  = 0;
+        scalar_t grad_w_ab = 0;
+        scalar_t grad_w_aa = 0;
+        scalar_t grad_w_bb = 0;
+        scalar_t grad_w_1  = 0;
         for (int row = row_; row < grad_y.size(1); row += BACKWARD_W_BATCH_THREADS) {  // batch dim
             const auto a_ = x[idx_a][row];
             const auto b_ = x[idx_b][row];
             const auto grad_y_ = grad_y[col][row];
             //its not the anaytical gradient. Computes the structural gradients that form the total.
             // compute grad_w
-            grad_w_local_1 += (a_ * b_) * grad_y_;
-            grad_w_local_3 += a_ * grad_y_;
-            grad_w_local_5 += b_ * grad_y_;
-            grad_w_local_15 += grad_y_;
+            grad_w_a  += a_ * grad_y_;
+            grad_w_b  += b_ * grad_y_;
+            grad_w_ab += (a_ * b_) * grad_y_;
+            grad_w_aa += (a_ * a_) * grad_y_;
+            grad_w_bb += (b_ * b_) * grad_y_;
+            grad_w_1  += grad_y_;
         }
 
-        grad_w_[col][row_][0] = grad_w_local_1;
-        grad_w_[col][row_][1] = grad_w_local_3;
-        grad_w_[col][row_][2] = grad_w_local_5;
-        grad_w_[col][row_][3] = grad_w_local_15;
+        grad_w_[col][row_][0] = grad_w_a;
+        grad_w_[col][row_][1] = grad_w_b;
+        grad_w_[col][row_][2] = grad_w_ab;
+        grad_w_[col][row_][3] = grad_w_aa;
+        grad_w_[col][row_][4] = grad_w_bb;
+        grad_w_[col][row_][5] = grad_w_1;
     }
 }
 
@@ -256,38 +262,26 @@ logic_layer_cuda_backward_x_kernel(
                 //derivate with respect to a
                 if (idx_is_a) {
                     const auto b_ = x[idx_b][row];
+                    const auto a_ = x[idx_a][row];
                     const auto dy_dx = (
-                        (w[idx_y][1] * b_
-                       + w[idx_y][2] * (static_cast<scalar_t>(1) - b_)
-                       + w[idx_y][3]) +
-                        (w[idx_y][4] * -b_
-                       + w[idx_y][6] * (static_cast<scalar_t>(1) - static_cast<scalar_t>(2) * b_)
-                       + w[idx_y][7] * (static_cast<scalar_t>(1) - b_)))
-                     + ((w[idx_y][8] * (b_ - static_cast<scalar_t>(1))
-                       + w[idx_y][9] * (static_cast<scalar_t>(2) * b_ - static_cast<scalar_t>(1))
-                       + w[idx_y][11] * b_)
-                     + (-w[idx_y][12]
-                       + w[idx_y][13] * (b_ - static_cast<scalar_t>(1))
-                       + w[idx_y][14] * -b_)
-                    );
+                        (w[idx_y][1]
+                        + (-w[idx_y][3])
+                        + w[idx_y][5] * b_)
+                        + (w[idx_y][6] * -b_
+                        + w[idx_y][8] * static_cast<scalar_t>(2) * a_
+                        + w[idx_y][10] * static_cast<scalar_t>(2) * -a_));
                     grad_x_ += dy_dx * grad_y_;
                 //derivate with respect to b
                 } else {
+                    const auto b_ = x[idx_b][row];
                     const auto a_ = x[idx_a][row];
                     const auto dy_dx = (
-                         (w[idx_y][1] * a_
-                        + w[idx_y][2] * -a_
-                        + w[idx_y][4] * (static_cast<scalar_t>(1) - a_))
-                       + (w[idx_y][5]
-                        + w[idx_y][6] * (static_cast<scalar_t>(1) - static_cast<scalar_t>(2) * a_)
-                        + w[idx_y][7] * (static_cast<scalar_t>(1) - a_)))
-                      + ((w[idx_y][8] * (a_ - static_cast<scalar_t>(1))
-                        + w[idx_y][9] * (static_cast<scalar_t>(2) * a_ - static_cast<scalar_t>(1))
-                        - w[idx_y][10])
-                       + (w[idx_y][11] * (a_ - static_cast<scalar_t>(1))
-                        + w[idx_y][13] * a_
-                        + w[idx_y][14] * -a_)
-                    );
+                        (w[idx_y][2]
+                        + (-w[idx_y][4])
+                        + w[idx_y][5] * a_)
+                        + (w[idx_y][6] * -a_
+                        + w[idx_y][9] * static_cast<scalar_t>(2) * b_
+                        + w[idx_y][11] * static_cast<scalar_t>(2) * -b_));
                     grad_x_ += dy_dx * grad_y_;
                 }
             }
@@ -361,8 +355,8 @@ torch::Tensor logic_layer_cuda_backward_w(
     const auto in_size = x.size(0);
     const auto out_size = grad_y.size(0);
 
-    //Holds per-thread partial sums of the 4 independent gradients. Shape: [neurons, threads_per_block, 4]
-    auto grad_w_4 = torch::empty({out_size, BACKWARD_W_BATCH_THREADS, 4}, torch::dtype(x.dtype()).device(x.device()));
+    //Holds per-thread partial sums of the 6 independent gradients. Shape: [neurons, threads_per_block, number_of_fund_gradients]
+    auto grad_w_6 = torch::empty({out_size, BACKWARD_W_BATCH_THREADS, 6}, torch::dtype(x.dtype()).device(x.device()));
 
     dim3 threads_per_block(BACKWARD_W_BATCH_THREADS, 1024 / BACKWARD_W_BATCH_THREADS);
 
@@ -377,7 +371,7 @@ torch::Tensor logic_layer_cuda_backward_w(
                                a.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
                                b.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
                                grad_y.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
-                               grad_w_4.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>());
+                               grad_w_6.packed_accessor64<scalar_t, 3, torch::RestrictPtrTraits>());
                        }));
 
     gpuErrchk(cudaPeekAtLastError());
@@ -385,34 +379,33 @@ torch::Tensor logic_layer_cuda_backward_w(
 
     //Sums over BACKWARD_W_BATCH_THREADS to get full batch accumulation
     //Shape becomes [out_size, 4]
-    const auto grad_w_components = grad_w_4.sum(1);
+    const auto grad_w_components = grad_w_6.sum(1);
     //Then each component is extracted
-    const auto grad_w_ab = grad_w_components.index({torch::indexing::Slice(), 0});
-    const auto grad_w_a = grad_w_components.index({torch::indexing::Slice(), 1});
-    const auto grad_w_b = grad_w_components.index({torch::indexing::Slice(), 2});
-    const auto grad_w_ = grad_w_components.index({torch::indexing::Slice(), 3});
+    const auto grad_w_a = grad_w_components.index({torch::indexing::Slice(), 0});
+    const auto grad_w_b = grad_w_components.index({torch::indexing::Slice(), 1});
+    const auto grad_w_ab = grad_w_components.index({torch::indexing::Slice(), 2});
+    const auto grad_w_aa = grad_w_components.index({torch::indexing::Slice(), 3});
+    const auto grad_w_bb = grad_w_components.index({torch::indexing::Slice(), 4});
+    const auto grad_w_ = grad_w_components.index({torch::indexing::Slice(), 5});
 
-    //The logic layer uses 16 weights but only 4 independent gradients are computed (AB, A, B, 1).
+    //The logic layer uses number_of_gates weights but only 6 independent gradients are computed (AB, AA, BB, A, B, 1).
     //All other weights are linear combinations of these 4 basis gradients.
     //The reconstruction is done with torch::stack:
-    //Shape: [out_size, 16]
+    //Shape: [out_size, number_of_gates]
     const auto grad_w = torch::stack({
-        torch::zeros({out_size}, torch::dtype(x.dtype()).device(x.device())),// w0 not used
-        grad_w_ab,  // w1 = AB
-        grad_w_a - grad_w_ab, // w2 = A - AB
-        grad_w_a,// w3 = A
-        grad_w_b - grad_w_ab,// w4 = B - AB
-        grad_w_b,// w5 = B
-        grad_w_a + grad_w_b - grad_w_ab - grad_w_ab,// w6 = A + B - 2AB
-        grad_w_a + grad_w_b - grad_w_ab,// w7 = A + B - AB
-        grad_w_ - grad_w_a - grad_w_b + grad_w_ab,// w8 = 1 - A - B + AB
-        grad_w_ - grad_w_a - grad_w_b + grad_w_ab + grad_w_ab,// w9 = 1 - A - B + 2AB
-        grad_w_ - grad_w_b, // w10 = 1 - B
-        grad_w_ - grad_w_b + grad_w_ab,// w11 = 1 - B + AB
-        grad_w_ - grad_w_a,// w12 = 1 - A
-        grad_w_ - grad_w_a + grad_w_ab,// w13 = 1 - A + AB
-        grad_w_ - grad_w_ab,// w14 = 1 - AB
-        grad_w_,// w15 = bias
+        -grad_w_,                         // w0  = -1
+        grad_w_a,                         // w1  = A
+        grad_w_b,                         // w2  = B
+        -grad_w_a,                        // w3  = -A
+        -grad_w_b,                        // w4  = -B
+        grad_w_ab,                        // w5  = AB
+        -grad_w_ab,                       // w6  = -AB
+        torch::zeros({out_size}, torch::dtype(x.dtype()).device(x.device())), // w7 = 0
+        grad_w_aa,                        // w8  = A²
+        grad_w_bb,                        // w9  = B²
+        -grad_w_aa,                       // w10 = -A²
+        -grad_w_bb,                       // w11 = -B²
+        grad_w_                           // w12 = 1
     }, 1);
 
 
@@ -472,61 +465,29 @@ torch::Tensor logic_layer_cuda_backward_x(
 /**  INFERENCE MODE  **************************************************************************************************/
 /**********************************************************************************************************************/
 
+// ===============================================================
+// CHANGED: ternary logic operator instead of binary bitwise gates
+// supports inputs in {-1,0,1}
+// ===============================================================
 
-// | id | Operator             | AB=00 | AB=01 | AB=10 | AB=11 |
-// |----|----------------------|-------|-------|-------|-------|
-// | 0  | 0                    | 0     | 0     | 0     | 0     |
-// | 1  | A and B              | 0     | 0     | 0     | 1     |
-// | 2  | not(A implies B)     | 0     | 0     | 1     | 0     |
-// | 3  | A                    | 0     | 0     | 1     | 1     |
-// | 4  | not(B implies A)     | 0     | 1     | 0     | 0     |
-// | 5  | B                    | 0     | 1     | 0     | 1     |
-// | 6  | A xor B              | 0     | 1     | 1     | 0     |
-// | 7  | A or B               | 0     | 1     | 1     | 1     |
-// | 8  | not(A or B)          | 1     | 0     | 0     | 0     |
-// | 9  | not(A xor B)         | 1     | 0     | 0     | 1     |
-// | 10 | not(B)               | 1     | 0     | 1     | 0     |
-// | 11 | B implies A          | 1     | 0     | 1     | 1     |
-// | 12 | not(A)               | 1     | 1     | 0     | 0     |
-// | 13 | A implies B          | 1     | 1     | 0     | 1     |
-// | 14 | not(A and B)         | 1     | 1     | 1     | 0     |
-// | 15 | 1                    | 1     | 1     | 1     | 1     |
-
-//returns the result of one of 16 binary logic operations depending on op_idx
-template <typename T> __device__ __forceinline__ T bin_op_eval(const T a_, const T b_, const int op_idx) {
-    switch (op_idx) {
-    case 0:
-        return static_cast<T>(0);
-    case 1:
-        return a_ & b_;
-    case 2:
-        return a_ & ~b_;
-    case 3:
-        return a_;
-    case 4:
-        return b_ & ~a_;
-    case 5:
-        return b_;
-    case 6:
-        return a_ ^ b_;
-    case 7:
-        return a_ | b_;
-    case 8:
-        return ~(a_ | b_);
-    case 9:
-        return ~(a_ ^ b_);
-    case 10:
-        return ~b_;
-    case 11:
-        return ~b_ | a_;
-    case 12:
-        return ~a_;
-    case 13:
-        return ~a_ | b_;
-    case 14:
-        return ~(a_ & b_);
-    default:
-        return ~static_cast<T>(0);
+template <typename T>
+__device__ __forceinline__ T tern_op_eval(const T a_, const T b_, const int op_idx)
+{
+    switch(op_idx)
+    {
+        case 0:  return static_cast<T>(-1);      // constant -1
+        case 1:  return a_;                      // A
+        case 2:  return b_;                      // B
+        case 3:  return -a_;                     // -A
+        case 4:  return -b_;                     // -B
+        case 5:  return a_ * b_;                 // A*B
+        case 6:  return -a_ * b_;                // -A*B
+        case 7:  return static_cast<T>(0);       // constant 0
+        case 8:  return a_ * a_;                 // A^2
+        case 9:  return b_ * b_;                 // B^2
+        case 10: return -a_ * a_;                // -A^2
+        case 11: return -b_ * b_;                // -B^2
+        default: return static_cast<T>(1);       // constant 1
     }
 }
 
@@ -558,7 +519,7 @@ __global__ void logic_layer_cuda_eval_kernel(
             const auto b_ = x[idx_b][row];
             const auto w_ = w[col];
             //applies one logic operation per neuron
-            y[col][row] = bin_op_eval(a_, b_, w_);
+            y[col][row] = tern_op_eval(a_, b_, w_);
         }
     }
 }
@@ -609,194 +570,122 @@ torch::Tensor logic_layer_cuda_eval(
 
 
 /**********************************************************************************************************************/
-
-//This kernel packs boolean values into the bits of an integer
-//t : [neurons, batch_in]
-//b : [neurons, batch_out]
-//batch_out = ceil(batch_in / bit_count)
-//Even though bool tensor stores bool, on GPUs (and CPUs) a boolean element usually occupies 1 byte, not 1 bit. 
-//we use less memory by packing
-template <typename scalar_t>
-__global__ void tensor_packbits_cuda_kernel(
-    torch::PackedTensorAccessor32<bool, 2, torch::RestrictPtrTraits> t,
-    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> b
-) {
-
-    for (  // neuron in b and t
-        auto row = blockIdx.y * blockDim.y + threadIdx.y;
-        row < t.size(0);
-        row += blockDim.y * gridDim.y
+// Packs a 2D ternary tensor (int8: -1,0,1) into 2-bit packed uint32_t
+__global__ void tensor_packtern_cuda_kernel(
+    const int8_t* __restrict__ t, // [neurons, batch]
+    uint32_t* __restrict__ out,   // packed output
+    int neurons,
+    int batch,
+    int pad_len
     ) {
-        for (  // batch in b
-            auto col = blockIdx.x * blockDim.x + threadIdx.x;
-            col < b.size(1);
-            col += blockDim.x * gridDim.x
-        ) {
+        int col = blockIdx.x * blockDim.x + threadIdx.x; // batch index
+        int row = blockIdx.y * blockDim.y + threadIdx.y; // neuron index
 
-            //Convert Integer Type to Unsigned (bit operations behave correctly only on unsigned integers)
-            typedef typename std::make_unsigned<scalar_t>::type unsigned_scalar_t;
-            //A union shares memory between variables.
-            union {
-                unsigned_scalar_t unsigned_scalar;
-                scalar_t signed_scalar;
-            } val;
-            //Determine Bit Capacity
-            constexpr int bit_count = std::numeric_limits<unsigned_scalar_t>::digits;
-            val.signed_scalar = b[row][col];
-            for (unsigned int i = 0; i < bit_count; ++i) {
-                const auto t_col = bit_count * col + i;
-                if (t_col < t.size(1)) {    
-                    const unsigned_scalar_t bit_mask = static_cast<unsigned_scalar_t>(t[row][t_col]) << i;
-                    val.unsigned_scalar = val.unsigned_scalar | bit_mask;
-                }
-            }
-            b[row][col] = val.signed_scalar;
-        }
-    }
+        if (col >= batch || row >= neurons) return;
+
+        int8_t val = t[row * batch + col];
+        // map ternary to 2-bit
+        uint32_t bits = (val == -1) ? 0b00 : ((val == 0) ? 0b01 : 0b10);
+
+        int packed_idx = (row * batch + col) / 16; // 16 2-bit values per uint32
+        int shift = ((row * batch + col) % 16) * 2;
+
+        atomicOr(&out[packed_idx], bits << shift); // set 2-bit
 }
 
-//PyTorch CUDA wrapper for tensor_packbits
-//batch_out = ceil(batch_in / bit_count)
-std::tuple<torch::Tensor, int> tensor_packbits_cuda(
-    torch::Tensor t,
-    const int bit_count
+// CUDA wrapper
+std::tuple<torch::Tensor,int> tensor_packtern_cuda(
+    torch::Tensor t, int bit_count=32
 ) {
-    //input check
     CHECK_INPUT(t);
+    const auto neurons = t.size(0);
+    const auto batch = t.size(1);
 
-    const auto batch_in_size = t.size(1);
-    //Packed batch size
-    const auto batch_out_size = ceil_div(batch_in_size, static_cast<int64_t>(bit_count));
-    const auto out_size = t.size(0);
-    //Padding length
-    const auto pad_len = (bit_count - batch_in_size % bit_count) % bit_count;
+    // pad to multiple of 16 (because 16 2-bit values per 32-bit integer)
+    int pad_len = (16 - (neurons * batch) % 16) % 16;
+    int packed_size = (neurons * batch + pad_len) / 16;
+
+    auto out = torch::zeros({packed_size}, torch::dtype(torch::kUInt32).device(t.device()));
 
     dim3 threads_per_block(32, 32);
-
-    const dim3 blocks_per_grid(
-        min(static_cast<int64_t>(65535), ceil_div(batch_out_size, static_cast<int64_t>(threads_per_block.x))),
-        min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
+    dim3 blocks_per_grid(
+        (batch + threads_per_block.x - 1) / threads_per_block.x,
+        (neurons + threads_per_block.y - 1) / threads_per_block.y
     );
 
-    //Choose integer type
-    auto dispatch_type = [bit_count]() {
-        switch (bit_count) {
-        case 8:
-            return torch::kInt8;
-        case 16:
-            return torch::kInt16;
-        case 32:
-            return torch::kInt32;
-        case 64:
-            return torch::kInt64;
-        default:
-            throw std::invalid_argument("`bit_count` has to be in { 8, 16, 32, 64 }");
-        }
-    }();
-    //Allocate output tensor
-    auto b = torch::zeros({out_size, batch_out_size}, torch::dtype(dispatch_type).device(t.device()));
+    tensor_packtern_cuda_kernel<<<blocks_per_grid, threads_per_block>>>(
+        t.data_ptr<int8_t>(),
+        out.data_ptr<uint32_t>(),
+        neurons,
+        batch,
+        pad_len
+    );
 
-    AT_DISPATCH_INTEGRAL_TYPES(b.type(), "tensor_packbits_cuda_kernel", ([&] {
-                                   tensor_packbits_cuda_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(t.packed_accessor32<bool, 2, torch::RestrictPtrTraits>(),
-                                                                                                                            b.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>());
-                               }));
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
-    return {b, pad_len};
+    return std::make_tuple(out, pad_len);
 }
-
 
 /**********************************************************************************************************************/
 
-//This kernel reads bits from packed integers and counts them per class.
-//b : packed bit tensor, shape = [neurons, packed_batch]
-//t : integer tensor, shape = [classes, batch]
-//Without packing: neurons × batch, ex: 512 neurons × 1024 samples
-//With packing: 512 × 16 integers. Much smaller memory and fewer operations.
-template <typename scalar_t>
-__global__ void groupbitsum_kernel(
-    torch::PackedTensorAccessor32<scalar_t, 2, torch::RestrictPtrTraits> b,
-    torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> t
+// Sum ternary values over groups of neurons
+__global__ void groupternsum_kernel(
+    const uint32_t* __restrict__ t, // packed tensor
+    int* __restrict__ out,          // [batch, k]
+    int neurons,
+    int batch,
+    int k,
+    int pad_len
 ) {
+    int col = blockIdx.x * blockDim.x + threadIdx.x; // batch
+    int row = blockIdx.y * blockDim.y + threadIdx.y; // class/group
 
-    for (  // class in t
-        auto row = blockIdx.y * blockDim.y + threadIdx.y;
-        row < t.size(0);
-        row += blockDim.y * gridDim.y
-    ) {
-        for (  // batch in t
-            auto col = blockIdx.x * blockDim.x + threadIdx.x;
-            col < t.size(1);
-            col += blockDim.x * gridDim.x
-        ) {
+    if (col >= batch || row >= k) return;
 
-            //Convert to Unsigned Type
-            typedef typename std::make_unsigned<scalar_t>::type unsigned_scalar_t;
-            //Union Trick
-            union scalar_t_ {
-                unsigned_scalar_t unsigned_scalar;
-                scalar_t signed_scalar;
-            };
-            //Determine Bit Capacity
-            constexpr int bit_count = std::numeric_limits<unsigned_scalar_t>::digits;
-            int res = 0;
-            //Neurons Per Class
-            const auto class_size = b.size(0) / t.size(0);
-            for (int i = 0; i < class_size; ++i) {
-                //Read Packed Integer
-                const scalar_t_ val = {.signed_scalar = b[row * class_size + i][col / bit_count]};
-                const unsigned_scalar_t bit_mask = static_cast<unsigned_scalar_t>(1) << static_cast<uint32_t>(col % bit_count);
-                //Convert to boolean and add to count
-                res += !!(val.unsigned_scalar & bit_mask);
-            }
-            t[row][col] = res;
-        }
+    int group_size = neurons / k;
+    int sum = 0;
+
+    for (int i = 0; i < group_size; ++i) {
+        int neuron_idx = row * group_size + i;
+        int flat_idx = neuron_idx * batch + col;
+        int packed_idx = flat_idx / 16;
+        int shift = (flat_idx % 16) * 2;
+        uint32_t bits = (t[packed_idx] >> shift) & 0b11;
+
+        // map back to ternary value
+        int val = (bits == 0b00) ? -1 : ((bits == 0b01) ? 0 : 1);
+        sum += val;
     }
+
+    out[col * k + row] = sum;
 }
-//PyTorch CUDA wrapper for groupbitsum_kernel
-torch::Tensor groupbitsum(
-    torch::Tensor b,
-    const int pad_len,
-    const int k
-) {
-    //input check
-    CHECK_INPUT(b);
 
-    //Determine Bit Size
-    const int bit_count = 8 * b.element_size();
-
-    const auto batch_in_size = b.size(1);
-    const auto in_size = b.size(0);
-    //Recover Original Batch Size
-    const auto batch_out_size = batch_in_size * bit_count - pad_len;
-    const auto out_size = static_cast<int64_t>(k);
-    assert(in_size % k == 0);
+// Wrapper
+torch::Tensor groupternsum(torch::Tensor t, int pad_len, int k, int neurons, int batch) {
+    CHECK_INPUT(t);
+    auto out = torch::zeros({batch, k}, torch::dtype(torch::kInt32).device(t.device()));
 
     dim3 threads_per_block(32, 32);
-
-    const dim3 blocks_per_grid(
-        min(static_cast<int64_t>(65535), ceil_div(batch_out_size, static_cast<int64_t>(threads_per_block.x))),
-        min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
+    dim3 blocks_per_grid(
+        (batch + threads_per_block.x - 1) / threads_per_block.x,
+        (k + threads_per_block.y - 1) / threads_per_block.y
     );
 
-    //Allocate Output Tensor
-    auto t = torch::zeros({out_size, batch_out_size}, torch::dtype(torch::kInt32).device(b.device()));
+    groupternsum_kernel<<<blocks_per_grid, threads_per_block>>>(
+        t.data_ptr<uint32_t>(),
+        out.data_ptr<int>(),
+        neurons,
+        batch,
+        k,
+        pad_len
+    );
 
-    //Kernel Dispatch
-    AT_DISPATCH_INTEGRAL_TYPES(b.type(), "groupbitsum_kernel", ([&] {
-                                   groupbitsum_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
-                                        b.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
-                                        t.packed_accessor32<int, 2, torch::RestrictPtrTraits>()
-                                        );
-                               }));
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 
-    //Transpose Output. Before transpose: t shape = [classes, batch], After transpose:[batch, classes]
-    return t.transpose(0, 1).contiguous();
+    return out;
 }
-
 
 /**********************************************************************************************************************/
 
