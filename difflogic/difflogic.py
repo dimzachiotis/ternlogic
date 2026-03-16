@@ -1,8 +1,8 @@
 import torch
-#import difflogic_cuda
+#import ternlogic_cuda
 import numpy as np
 from .functional import tern_op_s, get_unique_connections, GradFactor
-from .packbitstensor import PackBitsTensor
+from .packbitstensor import PackTernaryTensor
 #   uses modules initialized in files functional.py and packbitstensor.py
 
 
@@ -80,7 +80,7 @@ class LogicLayer(torch.nn.Module):
 
     #General forward pass function. Calls forward subfunctions 
     def forward(self, x):
-        if isinstance(x, PackBitsTensor):
+        if isinstance(x, PackTernaryTensor):
             assert not self.training, 'PackBitsTensor is not supported for the differentiable training mode.'
             assert self.device == 'cuda', 'PackBitsTensor is only supported for CUDA, not for {}. ' \
                                           'If you want fast inference on CPU, please use CompiledDiffLogicModel.' \
@@ -94,7 +94,7 @@ class LogicLayer(torch.nn.Module):
 
         #Based on self.implementation, calls the right forward subfunction
         if self.implementation == 'cuda':
-            if isinstance(x, PackBitsTensor):
+            if isinstance(x, PackTernaryTensor):
                 return self.forward_cuda_eval(x)
             return self.forward_cuda(x)
         elif self.implementation == 'python':
@@ -150,7 +150,7 @@ class LogicLayer(torch.nn.Module):
                     x, a, b, w, self.given_x_indices_of_y_start, self.given_x_indices_of_y
                 ).transpose(0, 1)
 
-    def forward_cuda_eval(self, x: PackBitsTensor):
+    def forward_cuda_eval(self, x: PackTernaryTensor):
         """
         WARNING: this is an in-place operation.
 
@@ -158,15 +158,15 @@ class LogicLayer(torch.nn.Module):
         :return:
         """
         assert not self.training
-        assert isinstance(x, PackBitsTensor)
+        assert isinstance(x, PackTernaryTensor)
         assert x.t.shape[0] == self.in_dim, (x.t.shape, self.in_dim)
 
         a, b = self.indices
         w = self.weights.argmax(-1).to(torch.uint8)
-        x.t = difflogic_cuda.eval(x.t, a, b, w)
+        x.t = ternlogic_cuda.eval(x.t, a, b, w)
 
         return x
-    #CUDA Eval with PackBitsTensor. PyTorch does not build a computation graph, so no backward pass possible
+    #CUDA Eval with PackTernaryTensor. PyTorch does not build a computation graph, so no backward pass possible
 
     def extra_repr(self):
         return '{}, {}, {}'.format(self.in_dim, self.out_dim, 'train' if self.training else 'eval')
@@ -208,7 +208,7 @@ class GroupSum(torch.nn.Module):
         self.device = device
 
     def forward(self, x):
-        if isinstance(x, PackBitsTensor):
+        if isinstance(x, PackTernaryTensor):
             return x.group_sum(self.k)
 
         assert x.shape[-1] % self.k == 0, (x.shape, self.k)
@@ -227,7 +227,7 @@ class LogicLayerCudaFunction(torch.autograd.Function):
     @staticmethod
     def forward(ctx, x, a, b, w, given_x_indices_of_y_start, given_x_indices_of_y):
         ctx.save_for_backward(x, a, b, w, given_x_indices_of_y_start, given_x_indices_of_y)
-        return difflogic_cuda.forward(x, a, b, w)
+        return ternlogic_cuda.forward(x, a, b, w)
 
     @staticmethod
     def backward(ctx, grad_y):
@@ -236,9 +236,9 @@ class LogicLayerCudaFunction(torch.autograd.Function):
 
         grad_w = grad_x = None
         if ctx.needs_input_grad[0]:
-            grad_x = difflogic_cuda.backward_x(x, a, b, w, grad_y, given_x_indices_of_y_start, given_x_indices_of_y)
+            grad_x = ternlogic_cuda.backward_x(x, a, b, w, grad_y, given_x_indices_of_y_start, given_x_indices_of_y)
         if ctx.needs_input_grad[3]:
-            grad_w = difflogic_cuda.backward_w(x, a, b, grad_y)
+            grad_w = ternlogic_cuda.backward_w(x, a, b, grad_y)
         return grad_x, None, None, grad_w, None, None, None
 
 
