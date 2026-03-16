@@ -35,14 +35,15 @@ torch::Tensor logic_layer_cuda_eval(
     torch::Tensor b,
     torch::Tensor w
 );
-std::tuple<torch::Tensor, int> tensor_packbits_cuda(
-    torch::Tensor t,
-    const int bit_count
+std::tuple<torch::Tensor, int> tensor_packtern_cuda(
+    torch::Tensor t
 );
-torch::Tensor groupbitsum(
-    torch::Tensor b,
-    const int pad_len,
-    const int k
+torch::Tensor groupternsum(
+    torch::Tensor t,   // packed tensor from tensor_packtern_cuda
+    int pad_len,       // padding returned by tensor_packtern_cuda
+    int k,             // number of neuron groups
+    int neurons,       // original number of neurons
+    int batch          // original batch size
 );
 
 //Module Creation
@@ -72,18 +73,18 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
         },
         "logic layer eval (CUDA)");
     m.def(
-        "tensor_packbits_cuda",
-        [](torch::Tensor t, const int bit_count) {
-            return tensor_packbits_cuda(t, bit_count);
+        "tensor_packtern_cuda",
+        [](torch::Tensor t) {
+            return tensor_packtern_cuda(t); // returns tuple (packed_tensor, pad_len)
         },
-        "ltensor_packbits_cuda (CUDA)");
+        "Pack ternary tensor into 2-bit representation (CUDA)"
+    );
+
     m.def(
-        "groupbitsum",
-        [](torch::Tensor b, const int pad_len, const unsigned int k) {
-            if (b.size(0) % k != 0) {
-                throw py::value_error("in_dim (" + std::to_string(b.size(0)) + ") has to be divisible by k (" + std::to_string(k) + ") but it is not");
-            }
-            return groupbitsum(b, pad_len, k);
+        "groupternsum",
+        [](torch::Tensor t, int pad_len, int k, int neurons, int batch) {
+            return groupternsum(t, pad_len, k, neurons, batch);
         },
-        "groupbitsum (CUDA)");
+        "Sum ternary packed tensor over neuron groups (CUDA)"
+    );
 }
