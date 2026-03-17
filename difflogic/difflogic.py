@@ -34,7 +34,7 @@ class LogicLayer(torch.nn.Module):
         #  creates a matrix of shape (out-dim)x(number_of_gates) with random variables that follow the N(0,1). Then it marks it as trainable 
         #  and registers it with the module, so it can be trained through collable python ready functions. Without Parameter the 
         #  tensor would be treated as a constant.
-        
+        self.num_gates = number_of_gates
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.device = device
