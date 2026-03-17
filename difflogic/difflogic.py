@@ -130,7 +130,7 @@ class LogicLayer(torch.nn.Module):
             assert x.device.type == 'cuda', x.device
         assert x.ndim == 2, x.ndim
 
-        x = x.transpose(0, 1)
+        x = x.transpose(0, 1).contiguous()
         x = x.contiguous()
         #Transpose for CUDA kernel because CUDA expects [features, batch].
 
