@@ -542,6 +542,8 @@ if __name__ == '__main__':
             "total": sort_desc_dict(total_stats)
         }
 
+        mlflow.log_dict(gate_stats_data, f"gate_stats_{args.experiment_id}.json")
+        
         # Save JSON
         os.makedirs('./results', exist_ok=True)
 
