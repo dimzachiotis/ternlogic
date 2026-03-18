@@ -319,6 +319,9 @@ if __name__ == '__main__':
     parser.add_argument('--grad-factor', type=float, default=1.)
 
     args = parser.parse_args()
+
+
+    mlflow.log_params(vars(args))
     #creates arg object
     ####################################################################################################################
 
@@ -380,6 +383,8 @@ if __name__ == '__main__':
                 'test_acc_train_mode': test_accuracy_train_mode,
             }
 
+            mlflow.log_metrics(r, step=i) 
+
             if args.packbits_eval:
                 r['train_acc_eval'] = packbits_eval(model, train_loader)
                 r['valid_acc_eval'] = packbits_eval(model, train_loader)
@@ -436,6 +441,8 @@ if __name__ == '__main__':
                 python_acc = correct / total
                 print('COMPILED PYTHON MODEL', num_bits , python_acc)
 
+                mlflow.log_metric(f"{args.experiment_id}_{num_bits}_tern_python_acc", python_acc)
+
                 #Store Accuracy of python compilation
                 if args.experiment_id is not None:
                     # Ensure results folder exists
@@ -474,6 +481,7 @@ if __name__ == '__main__':
             "total": sort_desc_dict(total_stats)
         }
 
+        mlflow.log_dict(gate_stats_data, f"gate_stats_{args.experiment_id}.json")
         # Save JSON
         os.makedirs('./results', exist_ok=True)
 
@@ -552,3 +560,5 @@ if __name__ == '__main__':
     #         json.dump(acc_data, f, indent=4)
 
     #     print(f"c_acc saved as JSON: {json_filename}") 
+
+mlflow.end_run()
