@@ -378,6 +378,7 @@ if __name__ == '__main__':
             train_accuracy_eval_mode = eval(model, train_loader, mode=False)
             test_accuracy_eval_mode = eval(model, test_loader, mode=False)
             test_accuracy_train_mode = eval(model, test_loader, mode=True)
+            loss_value = loss
 
             r = {
                 'train_acc_eval_mode': train_accuracy_eval_mode,
@@ -386,6 +387,7 @@ if __name__ == '__main__':
                 'valid_acc_train_mode': valid_accuracy_train_mode,
                 'test_acc_eval_mode': test_accuracy_eval_mode,
                 'test_acc_train_mode': test_accuracy_train_mode,
+                'loss': loss_value,
             }
 
             mlflow.log_metrics(r, step=i) 
