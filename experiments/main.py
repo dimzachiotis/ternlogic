@@ -2,6 +2,7 @@
 #trains a differentiable logic gate network, evaluates in multiple modes and optionally 
 #compiles the trained model to optimized C code
 
+import mlflow
 import argparse
 import math
 import random
@@ -321,11 +322,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    mlflow.log_params(vars(args))
+    mlflow.set_experiment("binary network")  
+
+    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}")
+
     #creates arg object
     ####################################################################################################################
 
     print(vars(args))
+    mlflow.log_params(vars(args))
 
     assert args.num_iterations % args.eval_freq == 0, (
         f'iteration count ({args.num_iterations}) has to be divisible by evaluation frequency ({args.eval_freq})'
