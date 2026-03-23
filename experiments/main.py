@@ -350,7 +350,7 @@ if __name__ == '__main__':
     #Start an MLflow run
     ####################################################################################################################
 
-    mlflow.set_experiment("varient number of layers, neurons,  ")
+    mlflow.set_experiment("varient number of layers, neurons, learning rate ")
     #Gives your run a readable name.
     mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}")
     
