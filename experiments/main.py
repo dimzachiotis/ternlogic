@@ -352,7 +352,7 @@ if __name__ == '__main__':
 
     mlflow.set_experiment("varient number of layers, neurons, learning rate ")
     #Gives your run a readable name.
-    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}")
+    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_ni{args.num_iterations}_seed{args.seed}_lr{args.learning_rate}")
     
     #creates arg object
     ####################################################################################################################
