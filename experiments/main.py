@@ -21,7 +21,7 @@ from results_json import ResultsJSON
 import mnist_dataset
 import uci_datasets
 #Custom logic-based neural network components
-
+shared_artifacts = "file:///home/dzach/projects/thesis/mlflow_shared/mlruns"
 shared_db_url = "sqlite:////home/dzach/projects/thesis/mlflow_shared/mlflow.db"
 mlflow.set_tracking_uri(shared_db_url)
 
@@ -326,7 +326,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    mlflow.set_experiment("varient number of layers, neurons, learning rate ")
+    mlflow.set_experiment("varient number of layers, neurons, learning rate ",artifact_location=shared_artifacts)
 
     mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_ni{args.num_iterations}_seed{args.seed}_lr{args.learning_rate}_bin")
 
