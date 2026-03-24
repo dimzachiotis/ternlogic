@@ -325,7 +325,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    exp_name = "varient number of layers, neurons, learning rate "
+    exp_name = "varient number of layers, neurons, learning rate"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
