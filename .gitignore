@@ -18,3 +18,8 @@ results/
 # OS
 .DS_Store
 Thumbs.db
+
+data-cifar/
+data-uci/
+home/
+mlruns/
