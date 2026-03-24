@@ -325,8 +325,19 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    exp_name = "varient number of layers, neurons, learning rate "
 
-    mlflow.set_experiment("varient number of layers, neurons, learning rate ",artifact_location=shared_artifacts)
+    # Check if the experiment exists
+    experiment = mlflow.get_experiment_by_name(exp_name)
+
+    if experiment is None:
+        # If it doesn't exist, create it with the FIXED artifact location
+        mlflow.create_experiment(exp_name, artifact_location=shared_artifacts)
+        mlflow.set_experiment(exp_name)
+    else:
+        # If it exists, just set it. 
+        # (Note: Existing experiments keep their original artifact_location)
+        mlflow.set_experiment(exp_name)
 
     mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_ni{args.num_iterations}_seed{args.seed}_lr{args.learning_rate}_bin")
 
