@@ -21,6 +21,7 @@ import mnist_dataset
 import uci_datasets
 #Custom logic-based neural network components
 
+shared_artifacts = "file:///home/dzach/projects/thesis/mlflow_shared/mlruns"
 shared_db_url = "sqlite:////home/dzach/projects/thesis/mlflow_shared/mlflow.db"
 mlflow.set_tracking_uri(shared_db_url)
 
@@ -350,8 +351,20 @@ if __name__ == '__main__':
     #Start an MLflow run
     ####################################################################################################################
 
-    mlflow.set_experiment("varient number of layers, neurons, learning rate ")
-    #Gives your run a readable name.
+    exp_name = "varient number of layers, neurons, learning rate "
+
+    # Check if the experiment exists
+    experiment = mlflow.get_experiment_by_name(exp_name)
+
+    if experiment is None:
+        # If it doesn't exist, create it with the FIXED artifact location
+        mlflow.create_experiment(exp_name, artifact_location=shared_artifacts)
+        mlflow.set_experiment(exp_name)
+    else:
+        # If it exists, just set it. 
+        # (Note: Existing experiments keep their original artifact_location)
+        mlflow.set_experiment(exp_name)    
+
     mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_ni{args.num_iterations}_seed{args.seed}_lr{args.learning_rate}")
     
     #creates arg object
