@@ -22,6 +22,10 @@ import mnist_dataset
 import uci_datasets
 #Custom logic-based neural network components
 
+shared_db_url = "sqlite:////home/dzach/projects/thesis/mlflow_shared/mlflow.db"
+mlflow.set_tracking_uri(shared_db_url)
+
+
 top_level_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if top_level_dir not in sys.path:
     sys.path.insert(0, top_level_dir)
@@ -322,9 +326,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
 
-    mlflow.set_experiment("binary network")  
+    mlflow.set_experiment("varient number of layers, neurons, learning rate ")
 
-    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}")
+    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_ni{args.num_iterations}_seed{args.seed}_lr{args.learning_rate}_bin")
 
     #creates arg object
     ####################################################################################################################
@@ -448,7 +452,7 @@ if __name__ == '__main__':
                 python_acc = correct / total
                 print('COMPILED PYTHON MODEL', num_bits , python_acc)
 
-                mlflow.log_metric(f"{args.experiment_id}_{num_bits}_tern_python_acc", python_acc)
+                mlflow.log_metric(f"{args.experiment_id}_{num_bits}_bin_python_acc", python_acc)
 
                 #Store Accuracy of python compilation
                 if args.experiment_id is not None:
