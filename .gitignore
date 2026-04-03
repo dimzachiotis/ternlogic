@@ -23,3 +23,5 @@ Thumbs.db
 lib/
 
 mlflow.db
+build/
+ternlogic_cuda.cpython-310-x86_64-linux-gnu.so
