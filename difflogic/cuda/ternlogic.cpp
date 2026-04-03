@@ -36,8 +36,7 @@ torch::Tensor logic_layer_cuda_eval(
     torch::Tensor w
 );
 std::tuple<torch::Tensor, int> tensor_packtern_cuda(
-    torch::Tensor t, 
-    int bit_count
+    torch::Tensor t
 );
 torch::Tensor groupternsum(
     torch::Tensor t,   // packed tensor from tensor_packtern_cuda
@@ -76,7 +75,7 @@ PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def(
         "tensor_packtern_cuda",
         [](torch::Tensor t) {
-            return tensor_packtern_cuda(t,32); // returns tuple (packed_tensor, pad_len)
+            return tensor_packtern_cuda(t); // returns tuple (packed_tensor, pad_len)
         },
         "Pack ternary tensor into 2-bit representation (CUDA)"
     );

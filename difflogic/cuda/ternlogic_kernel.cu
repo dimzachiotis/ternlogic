@@ -598,7 +598,7 @@ __global__ void tensor_packtern_cuda_kernel(
 
 // CUDA wrapper
 std::tuple<torch::Tensor,int> tensor_packtern_cuda(
-    torch::Tensor t, int bit_count=32
+    torch::Tensor t
 ) {
     CHECK_INPUT(t);
     const auto neurons = t.size(0);
