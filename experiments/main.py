@@ -12,8 +12,9 @@ from results_json import ResultsJSON
 
 import mnist_dataset
 import uci_datasets
-from difflogic import LogicLayer, GroupSum, PackBitsTensor, CompiledLogicNet
-
+from difflogic.difflogic import LogicLayer, GroupSum
+from difflogic.packbitstensor import PackBitsTensor
+from difflogic.compiled_model import CompiledLogicNet
 torch.set_num_threads(1)
 
 BITS_TO_TORCH_FLOATING_POINT_TYPE = {
