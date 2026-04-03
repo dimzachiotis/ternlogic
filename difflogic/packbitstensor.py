@@ -1,7 +1,7 @@
 #This file, is only used when cuda --implementation
 import torch
 import numpy as np
-#import ternlogic_cuda  # your compiled CUDA extension
+import ternlogic_cuda  # your compiled CUDA extension
 
 class PackTernaryTensor:
     def __init__(self, t: torch.LongTensor, num_gates: int, device='cuda'):
