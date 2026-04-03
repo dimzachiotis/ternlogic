@@ -5,11 +5,14 @@
 //Provides PyTorch half-precision utilities.
 #include <cuda.h>
 #include <cuda_runtime.h>
+#include <device_launch_parameters.h>
 //CUDA driver/runtime APIs for GPU programming.
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <vector>
+#include <sm_32_atomic_functions.h>
+#include <device_atomic_functions.h>
 //Standard C++ utilities
 
 //On NVIDIA GPUs, threads are executed in warps of 32
@@ -115,11 +118,11 @@ static inline __device__ double gpuAtomicAdd(double *address, double val) { retu
 //this function, behaves the same as bin_op_s
 template <typename scalar_t>
 __global__ void logic_layer_cuda_forward_kernel(
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> x,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> a,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> b,
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> w,
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> y
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> a,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> w,
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> y
 ) { //Inputs
     //x : [num_inputs, batch]
     //a : [num_neurons]
@@ -172,11 +175,11 @@ __global__ void logic_layer_cuda_forward_kernel(
 template <typename scalar_t>
 __global__ void
 logic_layer_cuda_backward_w_kernel(
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> x,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> a,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> b,
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> grad_y,
-    torch::PackedTensorAccessor64<scalar_t, 3, at::DefaultPtrTraits> grad_w_
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> a,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> grad_y,
+    torch::PackedTensorAccessor64<scalar_t, 3, torch::RestrictPtrTraits> grad_w_
 ) {
 
     const auto row_ = blockIdx.x * blockDim.x + threadIdx.x;
@@ -225,14 +228,14 @@ logic_layer_cuda_backward_w_kernel(
 template <typename scalar_t>
 __global__ void
 logic_layer_cuda_backward_x_kernel(
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> x,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> a,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> b,
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> w,
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> grad_y,
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> grad_x,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> given_x_indices_of_y_start,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> given_x_indices_of_y
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> a,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> w,
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> grad_y,
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> grad_x,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> given_x_indices_of_y_start,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> given_x_indices_of_y
 ) {
 
     for (  // batch dim
@@ -496,11 +499,11 @@ __device__ __forceinline__ T tern_op_eval(const T a_, const T b_, const int op_i
 //That means each neuron stores just the index of the chosen logic gate.
 template <typename scalar_t>
 __global__ void logic_layer_cuda_eval_kernel(
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> x,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> a,
-    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> b,
-    torch::PackedTensorAccessor64<uint8_t, 1, at::DefaultPtrTraits> w,
-    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> y
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> a,
+    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
+    torch::PackedTensorAccessor64<uint8_t, 1, torch::RestrictPtrTraits> w,
+    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> y
 ) {
     for (  // batch dim
         auto row = blockIdx.x * blockDim.x + threadIdx.x;
