@@ -6,7 +6,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 //CUDA driver/runtime APIs for GPU programming.
-
+#include <algorithm>
 #include <array>
 #include <cmath>
 #include <vector>
@@ -115,11 +115,11 @@ static inline __device__ double gpuAtomicAdd(double *address, double val) { retu
 //this function, behaves the same as bin_op_s
 template <typename scalar_t>
 __global__ void logic_layer_cuda_forward_kernel(
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> a,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> w,
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> y
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> x,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> a,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> b,
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> w,
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> y
 ) { //Inputs
     //x : [num_inputs, batch]
     //a : [num_neurons]
@@ -172,11 +172,11 @@ __global__ void logic_layer_cuda_forward_kernel(
 template <typename scalar_t>
 __global__ void
 logic_layer_cuda_backward_w_kernel(
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> a,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> grad_y,
-    torch::PackedTensorAccessor64<scalar_t, 3, torch::RestrictPtrTraits> grad_w_
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> x,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> a,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> b,
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> grad_y,
+    torch::PackedTensorAccessor64<scalar_t, 3, at::DefaultPtrTraits> grad_w_
 ) {
 
     const auto row_ = blockIdx.x * blockDim.x + threadIdx.x;
@@ -225,14 +225,14 @@ logic_layer_cuda_backward_w_kernel(
 template <typename scalar_t>
 __global__ void
 logic_layer_cuda_backward_x_kernel(
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> a,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> w,
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> grad_y,
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> grad_x,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> given_x_indices_of_y_start,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> given_x_indices_of_y
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> x,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> a,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> b,
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> w,
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> grad_y,
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> grad_x,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> given_x_indices_of_y_start,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> given_x_indices_of_y
 ) {
 
     for (  // batch dim
@@ -315,12 +315,12 @@ torch::Tensor logic_layer_cuda_forward(
 
     //65535 blocks per dimension
     const dim3 blocks_per_grid(
-        min(static_cast<int64_t>(65535), ceil_div(batch_size, static_cast<int64_t>(threads_per_block.x))),
-        min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
+        std::min(static_cast<int64_t>(65535), ceil_div(batch_size, static_cast<int64_t>(threads_per_block.x))),
+        std::min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
     );
 
     //Launch the CUDA Kernel
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.type(), "logic_layer_cuda_forward", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.scalar_type(), "logic_layer_cuda_forward", ([&] {
                            logic_layer_cuda_forward_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                x.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
                                a.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
@@ -362,10 +362,10 @@ torch::Tensor logic_layer_cuda_backward_w(
 
     const dim3 blocks_per_grid(
         1,
-        min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
+        std::min(static_cast<int64_t>(65535), ceil_div(out_size, static_cast<int64_t>(threads_per_block.y)))
     );
     //Launch CUDA Kernel
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.type(), "logic_layer_cuda_backward_w", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.scalar_type(), "logic_layer_cuda_backward_w", ([&] {
                            logic_layer_cuda_backward_w_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                x.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
                                a.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
@@ -436,12 +436,12 @@ torch::Tensor logic_layer_cuda_backward_x(
     dim3 threads_per_block(32, 32);
 
     const dim3 blocks_per_grid(
-        min(static_cast<int64_t>(65535), ceil_div(x.size(1), static_cast<int64_t>(threads_per_block.x))),
-        min(static_cast<int64_t>(65535), ceil_div(x.size(0), static_cast<int64_t>(threads_per_block.y)))
+        std::min(static_cast<int64_t>(65535), ceil_div(x.size(1), static_cast<int64_t>(threads_per_block.x))),
+        std::min(static_cast<int64_t>(65535), ceil_div(x.size(0), static_cast<int64_t>(threads_per_block.y)))
     );
     //Launch CUDA Kernel
     //the last two arguments describe which neurons depend on each input (Instead of checking all neurons, the kernel only loops over relevant ones)
-    AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.type(), "logic_layer_cuda_backward_x", ([&] {
+    AT_DISPATCH_FLOATING_TYPES_AND_HALF(x.scalar_type(), "logic_layer_cuda_backward_x", ([&] {
                            logic_layer_cuda_backward_x_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                x.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
                                a.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
@@ -496,11 +496,11 @@ __device__ __forceinline__ T tern_op_eval(const T a_, const T b_, const int op_i
 //That means each neuron stores just the index of the chosen logic gate.
 template <typename scalar_t>
 __global__ void logic_layer_cuda_eval_kernel(
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> x,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> a,
-    torch::PackedTensorAccessor64<int64_t, 1, torch::RestrictPtrTraits> b,
-    torch::PackedTensorAccessor64<uint8_t, 1, torch::RestrictPtrTraits> w,
-    torch::PackedTensorAccessor64<scalar_t, 2, torch::RestrictPtrTraits> y
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> x,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> a,
+    torch::PackedTensorAccessor64<int64_t, 1, at::DefaultPtrTraits> b,
+    torch::PackedTensorAccessor64<uint8_t, 1, at::DefaultPtrTraits> w,
+    torch::PackedTensorAccessor64<scalar_t, 2, at::DefaultPtrTraits> y
 ) {
     for (  // batch dim
         auto row = blockIdx.x * blockDim.x + threadIdx.x;
@@ -546,13 +546,13 @@ torch::Tensor logic_layer_cuda_eval(
     dim3 threads_per_block(32, 32);
 
     const dim3 blocks_per_grid(
-        min(static_cast<int64_t>(65535), ceil_div(x.size(1), static_cast<int64_t>(threads_per_block.x))),
-        min(static_cast<int64_t>(65535), ceil_div(x.size(0), static_cast<int64_t>(threads_per_block.y)))
+        std::min(static_cast<int64_t>(65535), ceil_div(x.size(1), static_cast<int64_t>(threads_per_block.x))),
+        std::min(static_cast<int64_t>(65535), ceil_div(x.size(0), static_cast<int64_t>(threads_per_block.y)))
     );
 
     //Dispatch for Integer Types.
     //Unlike training kernels (which used floating types), this kernel expects integer inputs, because it uses bitwise logic operations.
-    AT_DISPATCH_INTEGRAL_TYPES(x.type(), "logic_layer_cuda_eval_kernel", ([&] {
+    AT_DISPATCH_INTEGRAL_TYPES(x.scalar_type(), "logic_layer_cuda_eval_kernel", ([&] {
                                    logic_layer_cuda_eval_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                        x.packed_accessor64<scalar_t, 2, torch::RestrictPtrTraits>(),
                                        a.packed_accessor64<int64_t, 1, torch::RestrictPtrTraits>(),
