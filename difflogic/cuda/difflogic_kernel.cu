@@ -614,7 +614,7 @@ std::tuple<torch::Tensor, int> tensor_packbits_cuda(
     }();
     auto b = torch::zeros({out_size, batch_out_size}, torch::dtype(dispatch_type).device(t.device()));
 
-    AT_DISPATCH_INTEGRAL_TYPES(b.type(), "tensor_packbits_cuda_kernel", ([&] {
+    AT_DISPATCH_INTEGRAL_TYPES(b.scalar_type(), "tensor_packbits_cuda_kernel", ([&] {
                                    tensor_packbits_cuda_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(t.packed_accessor32<bool, 2, torch::RestrictPtrTraits>(),
                                                                                                                             b.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>());
                                }));
@@ -687,7 +687,7 @@ torch::Tensor groupbitsum(
 
     auto t = torch::zeros({out_size, batch_out_size}, torch::dtype(torch::kInt32).device(b.device()));
 
-    AT_DISPATCH_INTEGRAL_TYPES(b.type(), "groupbitsum_kernel", ([&] {
+    AT_DISPATCH_INTEGRAL_TYPES(b.scalar_type(), "groupbitsum_kernel", ([&] {
                                    groupbitsum_kernel<scalar_t><<<blocks_per_grid, threads_per_block>>>(
                                         b.packed_accessor32<scalar_t, 2, torch::RestrictPtrTraits>(),
                                         t.packed_accessor32<int, 2, torch::RestrictPtrTraits>()
