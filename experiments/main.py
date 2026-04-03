@@ -376,7 +376,7 @@ if __name__ == '__main__':
                 correct, total = 0, 0
                 with torch.no_grad():
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
-                        data = torch.nn.Flatten()(data).bool().numpy()
+                        data = torch.nn.Flatten()(data).round().bool().numpy()
 
                         output = compiled_model(data, verbose=True)
 
