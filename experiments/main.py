@@ -2,7 +2,7 @@ import argparse
 import math
 import random
 import os
-
+import sys
 import numpy as np
 import torch
 import torchvision
@@ -12,9 +12,17 @@ from results_json import ResultsJSON
 
 import mnist_dataset
 import uci_datasets
+
+top_level_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if top_level_dir not in sys.path:
+    sys.path.insert(0, top_level_dir)
+
+
 from difflogic.difflogic import LogicLayer, GroupSum
 from difflogic.packbitstensor import PackBitsTensor
 from difflogic.compiled_model import CompiledLogicNet
+
+
 torch.set_num_threads(1)
 
 BITS_TO_TORCH_FLOATING_POINT_TYPE = {
