@@ -33,14 +33,16 @@ class PackTernaryTensor:
             raise NotImplementedError(device)
 
     def group_sum(self, k):
-        """
-        Groups neurons in chunks of size k and sums them.
-        """
         assert self.device == 'cuda'
-        # Pass original neuron count including padding
-        neurons = self.t.size(0) * self.neurons_per_int - self.pad_neurons
-        batch = self.t.size(0)  # because we transposed to [batch, neurons]
-        return ternlogic_cuda.groupternsum(self.t, self.pad_len, k, neurons, batch)
+        # The tensor is [batch, packed_cols]
+        batch_size = self.t.size(0)
+        packed_cols = self.t.size(1)
+    
+        # Total neurons the kernel should process
+        # This must match the internal indexing of your .cu file!
+        logical_neurons = (packed_cols * 16) - self.pad_neurons
+    
+        return ternlogic_cuda.groupternsum(self.t, self.pad_len, k, logical_neurons, batch_size)
 
     def flatten(self, start_dim=0, end_dim=-1, **kwargs):
         return self
