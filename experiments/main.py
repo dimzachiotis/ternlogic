@@ -6,12 +6,17 @@ import sys
 import numpy as np
 import torch
 import torchvision
+import mlflow
 from tqdm import tqdm
 
 from results_json import ResultsJSON
 
 import mnist_dataset
 import uci_datasets
+
+shared_artifacts = "file:/home/dzachiotis/thesis/mlflow_shared/mlruns"
+shared_db_url = "sqlite:/home/dzachiotis/thesis/mlflow_shared/mlflow.db"
+mlflow.set_tracking_uri(shared_db_url)
 
 top_level_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if top_level_dir not in sys.path:
@@ -263,9 +268,28 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    #Start an MLflow run
+    ####################################################################################################################
+    exp_name = "main binary implementation"
+
+    # Check if the experiment exists
+    experiment = mlflow.get_experiment_by_name(exp_name)
+
+    if experiment is None:
+        # If it doesn't exist, create it with the FIXED artifact location
+        mlflow.create_experiment(exp_name, artifact_location=shared_artifacts)
+        mlflow.set_experiment(exp_name)
+    else:
+        # If it exists, just set it. 
+        mlflow.set_experiment(exp_name)    
+
+    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_bin")
+
     ####################################################################################################################
 
     print(vars(args))
+
+    mlflow.log_params(vars(args))
 
     assert args.num_iterations % args.eval_freq == 0, (
         f'iteration count ({args.num_iterations}) has to be divisible by evaluation frequency ({args.eval_freq})'
@@ -309,6 +333,7 @@ if __name__ == '__main__':
             train_accuracy_eval_mode = eval(model, train_loader, mode=False)
             test_accuracy_eval_mode = eval(model, test_loader, mode=False)
             test_accuracy_train_mode = eval(model, test_loader, mode=True)
+            loss_value = loss
 
             r = {
                 'train_acc_eval_mode': train_accuracy_eval_mode,
@@ -317,7 +342,11 @@ if __name__ == '__main__':
                 'valid_acc_train_mode': valid_accuracy_train_mode,
                 'test_acc_eval_mode': test_accuracy_eval_mode,
                 'test_acc_train_mode': test_accuracy_train_mode,
+                'loss': loss_value,
             }
+
+            #Log training metrics
+            mlflow.log_metrics(r, step=i)
 
             if args.packbits_eval:
                 r['train_acc_eval'] = packbits_eval(model, train_loader)
@@ -384,5 +413,8 @@ if __name__ == '__main__':
                         total += output.shape[0]
 
                 acc3 = correct / total
-                print('COMPILED MODEL', num_bits, acc3)
 
+                mlflow.log_metric(f"{num_bits}_bin_testing_acc", acc3)
+
+                print('COMPILED MODEL', num_bits, acc3)
+mlflow.end_run()
