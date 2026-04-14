@@ -365,8 +365,8 @@ if __name__ == '__main__':
                 else:
                     print('IS THE BEST UNTIL NOW.')
 
-            if args.experiment_id is not None:
-                results.save()
+            # if args.experiment_id is not None:
+            #     results.save()
 
     ####################################################################################################################
 
