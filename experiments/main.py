@@ -283,7 +283,7 @@ if __name__ == '__main__':
         # If it exists, just set it. 
         mlflow.set_experiment(exp_name)    
 
-    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_bin")
+    mlflow.start_run(run_name=f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_bin")
 
     ####################################################################################################################
 
