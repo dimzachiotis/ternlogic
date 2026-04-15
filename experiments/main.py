@@ -14,8 +14,8 @@ from results_json import ResultsJSON
 import mnist_dataset
 import uci_datasets
 
-shared_artifacts = "file:////thesis/mlflow_shared/mlruns"
-shared_db_url = "sqlite:////thesis/mlflow_shared/mlflow.db"
+shared_artifacts = "file:////home/dzachiotis/thesis/mlflow_shared/mlruns"
+shared_db_url = "sqlite:////home/dzachiotis/thesis/mlflow_shared/mlflow.db"
 mlflow.set_tracking_uri(shared_db_url)
 
 top_level_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
