@@ -36,7 +36,7 @@ from difflogic.packbitstensor import PackTernaryTensor
 from difflogic.compiled_model import CompiledLogicNet
 from difflogic.compiled_ternary_model_python import CompiledTernaryPython
 
-device ='cpu' if  not torch.cuda.is_available() else 'cuda'
+device ='cuda'
 #if no cuda available, then use cpu
 
 #Forces PyTorch to use one CPU thread
@@ -270,7 +270,7 @@ def eval(model, loader, mode):
                     (q := x.to(device)) < -0.5,
                         -1,
                         torch.where(q > 0.5, 1, 0)
-                    )
+                    ).float()
                 )
                 for x, y in loader
             ]
@@ -297,7 +297,7 @@ def packtern_eval(model, loader):
                                 (q := x.to(device).reshape(x.shape[0], -1)) < -0.5,
                                 -1,
                                 torch.where(q > 0.5, 1, 0)
-                            ),
+                            ).float(),
                             num_gates=model.num_gates,  # must match your model's gate count
                             device='cuda'
                         )
