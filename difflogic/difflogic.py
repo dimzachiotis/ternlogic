@@ -1,5 +1,5 @@
 import torch
-#import ternlogic_cuda
+import ternlogic_cuda
 import numpy as np
 from .functional import tern_op_s, get_unique_connections, GradFactor
 from .packbitstensor import PackTernaryTensor
