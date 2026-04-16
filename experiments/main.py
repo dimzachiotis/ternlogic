@@ -380,7 +380,7 @@ if __name__ == '__main__':
         mlflow.set_experiment(exp_name)    
 
     #Gives your run a readable name.
-    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern")
+    mlflow.start_run(run_name=f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern")
     
     #creates arg object
     ####################################################################################################################
@@ -573,7 +573,7 @@ if __name__ == '__main__':
             ],
             "total": sort_desc_dict(total_stats)
         }
-        mlflow.log_dict(gate_stats_data, f"gate_stats.json")
+        mlflow.log_dict(gate_stats_data, f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern_gate_stats.json")
         # # Save JSON
         # os.makedirs('./results', exist_ok=True)
 
