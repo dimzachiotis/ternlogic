@@ -36,7 +36,7 @@ from difflogic.packbitstensor import PackTernaryTensor
 from difflogic.compiled_model import CompiledLogicNet
 from difflogic.compiled_ternary_model_python import CompiledTernaryPython
 
-device ='cpu'
+device ='cuda'
 #if no cuda available, then use cpu
 
 #Forces PyTorch to use one CPU thread
@@ -380,7 +380,7 @@ if __name__ == '__main__':
         mlflow.set_experiment(exp_name)    
 
     #Gives your run a readable name.
-    mlflow.start_run(run_name=f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern")
+    mlflow.start_run(run_name=f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern_cpu")
     
     #creates arg object
     ####################################################################################################################
@@ -536,7 +536,7 @@ if __name__ == '__main__':
                 tern_acc = correct / total
                 print('COMPILED PYTHON MODEL', num_bits , tern_acc)
 
-                mlflow.log_metric(f"{args.experiment_id}_{num_bits}_tern_testing_acc_3", tern_acc)
+                mlflow.log_metric(f"{num_bits}_tern_testing_acc_3", tern_acc)
 
                 # #Store Accuracy of python compilation
                 # if args.experiment_id is not None:
