@@ -19,6 +19,11 @@ from results_json import ResultsJSON
 #Custom dataset loaders
 import mnist_dataset
 import uci_datasets
+
+shared_artifacts = "file:////home/dzachiotis/thesis/mlflow_shared/mlruns"
+shared_db_url = "sqlite:////home/dzachiotis/thesis/mlflow_shared/mlflow.db"
+mlflow.set_tracking_uri(shared_db_url)
+
 #Custom logic-based neural network components
 
 top_level_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
@@ -360,10 +365,22 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
+    exp_name = "tern logic net"
 
-    mlflow.set_experiment("ternlogic")
+    # Check if the experiment exists
+    experiment = mlflow.get_experiment_by_name(exp_name)
+
+    if experiment is None:
+        # If it doesn't exist, create it with the FIXED artifact location
+        mlflow.create_experiment(exp_name, artifact_location=shared_artifacts)
+        mlflow.set_experiment(exp_name)
+    else:
+        # If it exists, just set it. 
+        # (Note: Existing experiments keep their original artifact_location)
+        mlflow.set_experiment(exp_name)    
+
     #Gives your run a readable name.
-    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}")
+    mlflow.start_run(run_name=f"k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern")
     
     #creates arg object
     ####################################################################################################################
@@ -451,31 +468,31 @@ if __name__ == '__main__':
                     results.store_final_results(r)
                 else:
                     print('IS THE BEST UNTIL NOW.')
-            #Writes JSON file to disk
-            if args.experiment_id is not None:
-                results.save()
+            # #Writes JSON file to disk
+            # if args.experiment_id is not None:
+            #     results.save()
 ####################################################################################################################
-    #Store Weights
-    import json
+    # #Store Weights
+    # import json
 
-    if args.experiment_id is not None:
-    # Ensure results folder exists
-        os.makedirs('./results', exist_ok=True)
+    # if args.experiment_id is not None:
+    # # Ensure results folder exists
+    #     os.makedirs('./results', exist_ok=True)
 
-        layer_weights = []
-        for i, layer in enumerate(model):
-            if isinstance(layer, LogicLayer):
-                # Access the neuron weights (or connections, depending on your LogicLayer implementation)
-                weights = layer.weights.detach().cpu()
-                layer_weights.append(weights)
-                print(f"Layer {i}: weights shape={weights.shape}, mean={weights.mean():.4f}, std={weights.std():.4f}")
+    #     layer_weights = []
+    #     for i, layer in enumerate(model):
+    #         if isinstance(layer, LogicLayer):
+    #             # Access the neuron weights (or connections, depending on your LogicLayer implementation)
+    #             weights = layer.weights.detach().cpu()
+    #             layer_weights.append(weights)
+    #             print(f"Layer {i}: weights shape={weights.shape}, mean={weights.mean():.4f}, std={weights.std():.4f}")
 
-        # Save as JSON file (human-readable, can open in any text editor)
-        json_filename = f"./results/trained_weights_{args.experiment_id}_3.json"
-        weights_json = {f"layer_{i}": w.tolist() for i, w in enumerate(layer_weights)}
-        with open(json_filename, "w") as f:
-            json.dump(weights_json, f)
-        print(f"Neuron weights saved as JSON: {json_filename}")
+    #     # Save as JSON file (human-readable, can open in any text editor)
+    #     json_filename = f"./results/trained_weights_{args.experiment_id}_3.json"
+    #     weights_json = {f"layer_{i}": w.tolist() for i, w in enumerate(layer_weights)}
+    #     with open(json_filename, "w") as f:
+    #         json.dump(weights_json, f)
+    #     print(f"Neuron weights saved as JSON: {json_filename}")
 
     ####################################################################################################################
     
@@ -519,26 +536,26 @@ if __name__ == '__main__':
 
                 mlflow.log_metric(f"{args.experiment_id}_{num_bits}_tern_testing_acc_3", tern_acc)
 
-                #Store Accuracy of python compilation
-                if args.experiment_id is not None:
-                    # Ensure results folder exists
-                    os.makedirs('./results', exist_ok=True)
+                # #Store Accuracy of python compilation
+                # if args.experiment_id is not None:
+                #     # Ensure results folder exists
+                #     os.makedirs('./results', exist_ok=True)
 
-                    # Prepare filename
-                    json_filename = f"./results/{args.experiment_id}_{num_bits}_ternary_3.json"
+                #     # Prepare filename
+                #     json_filename = f"./results/{args.experiment_id}_{num_bits}_ternary_3.json"
 
-                    # If tern_acc is a tensor, convert it to float
-                    if isinstance(tern_acc, torch.Tensor):
-                        tern_acc = tern_acc.item()  # gets the scalar value as a float
+                #     # If tern_acc is a tensor, convert it to float
+                #     if isinstance(tern_acc, torch.Tensor):
+                #         tern_acc = tern_acc.item()  # gets the scalar value as a float
 
-                    # Wrap in dict for JSON
-                    acc_data = {'accuracy': tern_acc}
+                #     # Wrap in dict for JSON
+                #     acc_data = {'accuracy': tern_acc}
 
-                    # Save to JSON
-                    with open(json_filename, "w") as f:
-                        json.dump(acc_data, f, indent=4)
+                #     # Save to JSON
+                #     with open(json_filename, "w") as f:
+                #         json.dump(acc_data, f, indent=4)
 
-                    print(f"python_ternary_acc saved as JSON: {json_filename}") 
+                #     print(f"python_ternary_acc saved as JSON: {json_filename}") 
 
         layer_stats, total_stats = compiled_model.gate_statistics()
 
@@ -556,13 +573,13 @@ if __name__ == '__main__':
             ],
             "total": sort_desc_dict(total_stats)
         }
+        mlflow.log_dict(gate_stats_data, f"gate_stats.json")
+        # # Save JSON
+        # os.makedirs('./results', exist_ok=True)
 
-        # Save JSON
-        os.makedirs('./results', exist_ok=True)
+        # json_filename = f"./results/{args.experiment_id}_gate_stats_case_3.json"
 
-        json_filename = f"./results/{args.experiment_id}_gate_stats_case_3.json"
-
-        with open(json_filename, "w") as f:
-            json.dump(gate_stats_data, f, indent=4)
+        # with open(json_filename, "w") as f:
+        #     json.dump(gate_stats_data, f, indent=4)
 #End the run
 mlflow.end_run()
