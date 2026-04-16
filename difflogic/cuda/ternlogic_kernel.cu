@@ -155,7 +155,7 @@ __global__ void logic_layer_cuda_forward_kernel(
             const auto w_ = w[col];
 
             y[col][row] =
-                w_[0]                                       // -1
+                w_[0] * static_cast<scalar_t>(-1);            // -1
                 + w_[1] * a_                                  // A
                 + w_[2] * b_                                  // B
                 + w_[3] * (-a_)                               // -A
