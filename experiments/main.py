@@ -335,7 +335,7 @@ if __name__ == '__main__':
     parser.add_argument('--learning-rate', '-lr', type=float, default=0.01, help='learning rate (default: 0.01)')
     parser.add_argument('--training-bit-count', '-c', type=int, default=32, help='training bit count (default: 32)')
 
-    parser.add_argument('--implementation', type=str, default=device, choices=['cuda', 'python'],
+    parser.add_argument('--implementation', type=str, default='cuda', choices=['cuda', 'python'],
                         help='`cuda` is the fast CUDA implementation and `python` is simpler but much slower '
                         'implementation intended for helping with the understanding.')
 
