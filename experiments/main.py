@@ -36,7 +36,7 @@ from difflogic.packbitstensor import PackTernaryTensor
 from difflogic.compiled_model import CompiledLogicNet
 from difflogic.compiled_ternary_model_python import CompiledTernaryPython
 
-device ='cuda'
+device ='cpu'
 #if no cuda available, then use cpu
 
 #Forces PyTorch to use one CPU thread
@@ -268,9 +268,9 @@ def eval(model, loader, mode):
                     # Move tensor to computation device and apply ternary thresholding
                     torch.where(
                     (q := x.to(device)) < -0.5,
-                        -1,
-                        torch.where(q > 0.5, 1, 0)
-                    ).float()
+                        -1.0,
+                        torch.where(q > 0.5, 1.0, 0.0)
+                    )
                 )
                 for x, y in loader
             ]
@@ -295,9 +295,9 @@ def packtern_eval(model, loader):
                             # Convert input to hard ternary values {-1,0,1}
                             torch.where(
                                 (q := x.to(device).reshape(x.shape[0], -1)) < -0.5,
-                                -1,
-                                torch.where(q > 0.5, 1, 0)
-                            ).float(),
+                                -1.0,
+                                torch.where(q > 0.5, 1.0, 0.0)
+                            ),
                             num_gates=model.num_gates,  # must match your model's gate count
                             device='cuda'
                         )
@@ -520,10 +520,12 @@ if __name__ == '__main__':
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
                         #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
                         data = torch.nn.Flatten()(data)
+                        data = data.to(device)
+                        labels=labels.to(device)
                         # ternary quantization to {-1, 0, 1}
                         data = torch.where(
-                            data < -0.5,-1,
-                            torch.where(data > 0.5, 1, 0))
+                            data < -0.5,-1.0,
+                            torch.where(data > 0.5, 1.0, 0.0))
 
                         #Returns predictions as outputs shape[batch size,number of classes]
                         output = compiled_model.forward(data)
