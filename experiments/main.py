@@ -270,7 +270,7 @@ def eval(model, loader, mode):
                     (q := x.to(device)) < -0.5,
                         -1.0,
                         torch.where(q > 0.5, 1.0, 0.0)
-                    )
+                    ).to(torch.float32)
                 )
                 for x, y in loader
             ]
@@ -297,9 +297,9 @@ def packtern_eval(model, loader):
                                 (q := x.to(device).reshape(x.shape[0], -1)) < -0.5,
                                 -1.0,
                                 torch.where(q > 0.5, 1.0, 0.0)
-                            ),
+                            ).to(torch.float32),
                             num_gates=model.num_gates,  # must match your model's gate count
-                            device='cuda'
+                            device=device
                         )
                     ).argmax(-1) == y.to(device)
                 )
@@ -525,7 +525,7 @@ if __name__ == '__main__':
                         # ternary quantization to {-1, 0, 1}
                         data = torch.where(
                             data < -0.5,-1.0,
-                            torch.where(data > 0.5, 1.0, 0.0))
+                            torch.where(data > 0.5, 1.0, 0.0)).to(torch.float32)
 
                         #Returns predictions as outputs shape[batch size,number of classes]
                         output = compiled_model.forward(data)
