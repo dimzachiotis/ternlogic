@@ -328,8 +328,6 @@ if __name__ == '__main__':
             desc='iteration',
             total=args.num_iterations,
     ):
-        if i < 3:
-            print(f"implementation={args.implementation}, batch={i}, y[:5]={y[:5]}")
         x = x.to(BITS_TO_TORCH_FLOATING_POINT_TYPE[args.training_bit_count]).to('cuda')
         y = y.to('cuda')
 
