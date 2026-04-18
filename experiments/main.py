@@ -51,7 +51,7 @@ BITS_TO_TORCH_FLOATING_POINT_TYPE = {
 
 #Dataset loading function.
 #Loads datasets and returns:train_loader, validation_loader and test_loader
-def load_dataset(args):
+def load_dataset(args, g=None):
     validation_loader = None
     #Default: no validation set unless explicitly created
 
@@ -59,20 +59,20 @@ def load_dataset(args):
     if args.dataset == 'adult':
         train_set = uci_datasets.AdultDataset('./data-uci', split='train', download=True, with_val=False)
         test_set = uci_datasets.AdultDataset('./data-uci', split='test', with_val=False)
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
     #Breast cancer dataset
     elif args.dataset == 'breast_cancer':
         train_set = uci_datasets.BreastCancerDataset('./data-uci', split='train', download=True, with_val=False)
         test_set = uci_datasets.BreastCancerDataset('./data-uci', split='test', with_val=False)
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
     #MONK datasets
     elif args.dataset.startswith('monk'):
         style = int(args.dataset[4])
         train_set = uci_datasets.MONKsDataset('./data-uci', style, split='train', download=True, with_val=False)
         test_set = uci_datasets.MONKsDataset('./data-uci', style, split='test', with_val=False)
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
     #MNIST datasets
     elif args.dataset in ['mnist', 'mnist20x20']:
@@ -85,7 +85,7 @@ def load_dataset(args):
         train_set, validation_set = torch.utils.data.random_split(train_set, [train_set_size, valid_set_size])
         #Randomly splits dataset
 
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, pin_memory=True, drop_last=True, num_workers=4)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, pin_memory=True, drop_last=True, num_workers=4, worker_init_fn=seed_worker, generator=g)
         validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=args.batch_size, shuffle=False, pin_memory=True, drop_last=True)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=args.batch_size, shuffle=False, pin_memory=True, drop_last=True)
         #Drops last incomplete batch, ensuring consistent batch size
@@ -312,6 +312,11 @@ def packtern_eval(model, loader):
         model.train(mode=orig_mode)
     return res
 
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
 #Main script - Example usage
 #IMPORTANT
 #When Python starts executing a file, it automatically creates several special variables, including:
@@ -380,7 +385,7 @@ if __name__ == '__main__':
         mlflow.set_experiment(exp_name)    
 
     #Gives your run a readable name.
-    mlflow.start_run(run_name=f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern")
+    mlflow.start_run(run_name=f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern_{device}")
     
     #creates arg object
     ####################################################################################################################
@@ -399,12 +404,19 @@ if __name__ == '__main__':
         #Creates experiment log file
         results.store_args(args)
 
+    # Seed before model init
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
-    #keeping same seed number, it ensures reproducibility
-    train_loader, validation_loader, test_loader = load_dataset(args)
     model, loss_fn, optim = get_model(args)
+
+    # Seed again before data loader so model init random calls don't affect data order
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    g = torch.Generator()
+    g.manual_seed(args.seed)
+    train_loader, validation_loader, test_loader = load_dataset(args, g)
     #Load data & model
     ####################################################################################################################
 
