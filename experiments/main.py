@@ -37,23 +37,23 @@ BITS_TO_TORCH_FLOATING_POINT_TYPE = {
 }
 
 
-def load_dataset(args):
+def load_dataset(args, g=None):
     validation_loader = None
     if args.dataset == 'adult':
         train_set = uci_datasets.AdultDataset('./data-uci', split='train', download=True, with_val=False)
         test_set = uci_datasets.AdultDataset('./data-uci', split='test', with_val=False)
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
     elif args.dataset == 'breast_cancer':
         train_set = uci_datasets.BreastCancerDataset('./data-uci', split='train', download=True, with_val=False)
         test_set = uci_datasets.BreastCancerDataset('./data-uci', split='test', with_val=False)
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
     elif args.dataset.startswith('monk'):
         style = int(args.dataset[4])
         train_set = uci_datasets.MONKsDataset('./data-uci', style, split='train', download=True, with_val=False)
         test_set = uci_datasets.MONKsDataset('./data-uci', style, split='test', with_val=False)
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, worker_init_fn=seed_worker, generator=g)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=int(1e6), shuffle=False)
     elif args.dataset in ['mnist', 'mnist20x20']:
         train_set = mnist_dataset.MNIST('./data-mnist', train=True, download=True, remove_border=args.dataset == 'mnist20x20')
@@ -63,7 +63,7 @@ def load_dataset(args):
         valid_set_size = len(train_set) - train_set_size
         train_set, validation_set = torch.utils.data.random_split(train_set, [train_set_size, valid_set_size])
 
-        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, pin_memory=True, drop_last=True, num_workers=4)
+        train_loader = torch.utils.data.DataLoader(train_set, batch_size=args.batch_size, shuffle=True, pin_memory=True, drop_last=True, num_workers=4, worker_init_fn=seed_worker, generator=g)
         validation_loader = torch.utils.data.DataLoader(validation_set, batch_size=args.batch_size, shuffle=False, pin_memory=True, drop_last=True)
         test_loader = torch.utils.data.DataLoader(test_set, batch_size=args.batch_size, shuffle=False, pin_memory=True, drop_last=True)
     elif 'cifar-10' in args.dataset:
@@ -223,6 +223,11 @@ def packbits_eval(model, loader):
         model.train(mode=orig_mode)
     return res.item()
 
+def seed_worker(worker_id):
+    worker_seed = torch.initial_seed() % 2**32
+    np.random.seed(worker_seed)
+    random.seed(worker_seed)
+
 
 if __name__ == '__main__':
 
@@ -300,12 +305,19 @@ if __name__ == '__main__':
         results = ResultsJSON(eid=args.experiment_id, path='./results/')
         results.store_args(args)
 
+    # Seed before model init
     torch.manual_seed(args.seed)
     random.seed(args.seed)
     np.random.seed(args.seed)
-
-    train_loader, validation_loader, test_loader = load_dataset(args)
     model, loss_fn, optim = get_model(args)
+
+    # Seed again before data loader so model init random calls don't affect data order
+    torch.manual_seed(args.seed)
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    g = torch.Generator()
+    g.manual_seed(args.seed)
+    train_loader, validation_loader, test_loader = load_dataset(args, g)
 
     ####################################################################################################################
 
