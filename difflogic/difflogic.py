@@ -30,7 +30,7 @@ class LogicLayer(torch.nn.Module):
         :param connections: method for initializing the connectivity of the logic gate net
         """
         super().__init__()
-        self.weights = torch.nn.parameter.Parameter(torch.randn(out_dim, 16, device=device))
+        self.weights = torch.nn.parameter.Parameter(torch.randn(out_dim, 16).to(device))
         self.in_dim = in_dim
         self.out_dim = out_dim
         self.device = device
