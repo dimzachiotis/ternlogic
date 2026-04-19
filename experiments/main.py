@@ -357,13 +357,13 @@ if __name__ == '__main__':
                 'loss': loss_value,
             }
 
-            #Log training metrics
-            mlflow.log_metrics(r, step=i)
-
             if args.packbits_eval:
                 r['train_acc_eval'] = packbits_eval(model, train_loader)
                 r['valid_acc_eval'] = packbits_eval(model, train_loader)
                 r['test_acc_eval'] = packbits_eval(model, test_loader)
+            
+            #Log training metrics
+            mlflow.log_metrics(r, step=i)
 
             if args.experiment_id is not None:
                 results.store_results(r)
