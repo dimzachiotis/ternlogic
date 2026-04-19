@@ -370,7 +370,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "tern logic net"
+    exp_name = "tern same connections, re-seeding"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
