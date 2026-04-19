@@ -30,7 +30,7 @@ class LogicLayer(torch.nn.Module):
         :param connections: method for initializing the connectivity of the logic gate net
         """
         super().__init__()
-        self.weights = torch.nn.parameter.Parameter(torch.randn(out_dim, number_of_gates, device=device))
+        self.weights = torch.nn.parameter.Parameter(torch.randn(out_dim, number_of_gates).to(device))
         #  creates a matrix of shape (out-dim)x(number_of_gates) with random variables that follow the N(0,1). Then it marks it as trainable 
         #  and registers it with the module, so it can be trained through collable python ready functions. Without Parameter the 
         #  tensor would be treated as a constant.
