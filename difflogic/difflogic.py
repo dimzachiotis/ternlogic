@@ -40,6 +40,7 @@ class LogicLayer(torch.nn.Module):
         self.device = device
         self.grad_factor = grad_factor
 
+
         """
         The CUDA implementation is the fast implementation. As the name implies, the cuda implementation is only 
         available for device='cuda'. The `python` implementation exists for 2 reasons:
