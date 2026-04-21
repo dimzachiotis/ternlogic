@@ -405,6 +405,14 @@ if __name__ == '__main__':
     #keeping same seed number, it ensures reproducibility
     train_loader, validation_loader, test_loader = load_dataset(args)
     model, loss_fn, optim = get_model(args)
+
+    mlflow.log_param("loss_type", loss_fn.__class__.__name__)
+    mlflow.log_param("optimizer_type", optim.__class__.__name__)
+    mlflow.log_param("logic_type", "ternary")
+
+    gates_used=['0','1','2','3','4','5','6','7','8','9','10','11','12']
+    mlflow.log_param("gate_types_used", ", ".join(gates_used))
+
     #Load data & model
     ####################################################################################################################
 
@@ -560,22 +568,14 @@ if __name__ == '__main__':
                 #     print(f"python_ternary_acc saved as JSON: {json_filename}") 
 
         layer_stats, total_stats = compiled_model.gate_statistics()
+        final_metrics = {}
+        for gate_type, count in total_stats.items():
+            final_metrics[f"total_chosen_gate_{gate_type}"] = float(count)
+        for i, layer_counter in enumerate(layer_stats):
+            for gate_type, count in layer_counter.items():
+                final_metrics[f"L{i}_chosen_gate_{gate_type}"] = float(count)
+        mlflow.log_metrics(final_metrics, step=args.num_iterations)
 
-        # Sort dictionary in decreasing order
-        def sort_desc_dict(d):
-            return dict(sorted(d.items(), key=lambda x: x[1], reverse=True))
-
-        gate_stats_data = {
-            "layers": [
-                {
-                    "layer": i,
-                    "gates": sort_desc_dict(stats)
-                }
-                for i, stats in enumerate(layer_stats)
-            ],
-            "total": sort_desc_dict(total_stats)
-        }
-        mlflow.log_dict(gate_stats_data, f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern_gate_stats.json")
         # # Save JSON
         # os.makedirs('./results', exist_ok=True)
 
