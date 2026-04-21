@@ -91,6 +91,22 @@ class CompiledLogicNet(torch.nn.Module):
 
         self.lib_fn = None
 
+    def gate_statistics(self):
+        from collections import Counter
+        
+        total_stats = Counter()
+        layer_stats = []
+
+        # In your class, self.layers contains (indices_a, indices_b, argmax_weights)
+        for layer_id, (_, _, layer_op) in enumerate(self.layers):
+            # layer_op is the result of weights.argmax(1)
+            # which are the "chosen" gates for this layer
+            layer_counter = Counter(layer_op.tolist())
+            layer_stats.append(layer_counter)
+            total_stats.update(layer_counter)
+
+        return layer_stats, total_stats
+    
     def get_gate_code(self, var1, var2, gate_op):
         operation_name = ALL_OPERATIONS[gate_op]
 
