@@ -270,7 +270,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "main binary implementation"
+    exp_name = "binary baseline"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
@@ -423,10 +423,10 @@ if __name__ == '__main__':
         layer_stats, total_stats = compiled_model.gate_statistics()
         final_metrics = {}
         for gate_type, count in total_stats.items():
-            final_metrics[f"total_chosen_gate_{gate_type}"] = float(count)
+            final_metrics[f"total_gate_{gate_type}"] = float(count)
         for i, layer_counter in enumerate(layer_stats):
             for gate_type, count in layer_counter.items():
-                final_metrics[f"L{i}_chosen_gate_{gate_type}"] = float(count)
+                final_metrics[f"L{i}_gate_{gate_type}"] = float(count)
         mlflow.log_metrics(final_metrics, step=args.num_iterations)
 
 mlflow.end_run()
