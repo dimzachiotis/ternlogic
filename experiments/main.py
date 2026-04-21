@@ -8,7 +8,7 @@ import torch
 import torchvision
 import mlflow
 from tqdm import tqdm
-
+from collections import Counter
 from results_json import ResultsJSON
 
 import mnist_dataset
@@ -307,6 +307,9 @@ if __name__ == '__main__':
     train_loader, validation_loader, test_loader = load_dataset(args)
     model, loss_fn, optim = get_model(args)
 
+    mlflow.log_param("loss_type", loss_fn.__class__.__name__)
+    mlflow.log_param("optimizer_type", optim.__class__.__name__)
+    mlflow.log_param("logic_type", "binary")
     ####################################################################################################################
 
     best_acc = 0
@@ -417,4 +420,13 @@ if __name__ == '__main__':
                 mlflow.log_metric(f"{num_bits}_bin_testing_acc", acc3)
 
                 print('COMPILED MODEL', num_bits, acc3)
+        layer_stats, total_stats = compiled_model.gate_statistics()
+        final_metrics = {}
+        for gate_type, count in total_stats.items():
+            final_metrics[f"total_chosen_gate_{gate_type}"] = float(count)
+        for i, layer_counter in enumerate(layer_stats):
+            for gate_type, count in layer_counter.items():
+                final_metrics[f"L{i}_chosen_gate_{gate_type}"] = float(count)
+        mlflow.log_metrics(final_metrics, step=args.num_iterations)
+
 mlflow.end_run()
