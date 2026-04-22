@@ -1,47 +1,50 @@
 #!/bin/bash
 
-dataset=mnist
+# Configuration
+seeds=(0 1 2)
+k_values=(64000 32000 16000 8000)
+l_values=(1 2 4 6)
+LOG_DIR="./logs"
+mkdir -p "$LOG_DIR"
 
-for seed in 0 1 2; do
-  for k in 64000 32000 16000 8000; do
-    for l in 1 2 4 6; do
-      kl=$((k * l))
+for seed in "${seeds[@]}"; do
+    for k in "${k_values[@]}"; do
+        for l in "${l_values[@]}"; do
+            
+            # Calculate kl product
+            kl=$((k * l))
 
-      if   [ "$kl" -ge $((64000*6)) ]; then max_jobs=1
-      elif [ "$kl" -ge $((32000*4)) ]; then max_jobs=2
-      elif [ "$kl" -ge $((16000*4)) ]; then max_jobs=4
-      else                                  max_jobs=8
-      fi
+            # Dynamic max_jobs logic
+            if [ "$kl" -ge $((64000 * 6)) ]; then
+                max_jobs=1
+            elif [ "$kl" -ge $((32000 * 6)) ]; then
+                max_jobs=2
+            elif [ "$kl" -ge $((16000 * 6)) ]; then
+                max_jobs=4
+            else
+                max_jobs=8
+            fi
 
-      # For very heavy jobs wait for everything to finish first
-      if [ "$max_jobs" -eq 1 ]; then
-        wait
-        echo "Cleared all jobs, starting heavy: k=$k l=$l seed=$seed"
-      fi
+            # Define log file for this specific separate bash
+            log_file="$LOG_DIR/exp_s${seed}_k${k}_l${l}.log"
 
-      # Wait until a slot is free
-      while [ "$(jobs -r | wc -l)" -ge "$max_jobs" ]; do
-        sleep 5
-      done
+            # Command string
+            cmd="python experiments/main.py \
+                -bs 100 -t 30 --dataset mnist -ni 200000 -ef 1000 \
+                -k $k -l $l --compile_model --implementation cuda \
+                --seed $seed --connections unique"
 
-      echo "Starting: seed=$seed k=$k l=$l kl=$kl max_jobs=$max_jobs"
+            # Execute in a separate bash background process
+            # Output is redirected to the log file so you can inspect it later
+            bash -c "echo 'Starting Experiment...'; $cmd" > "$log_file" 2>&1 &
 
-      python experiments/main.py \
-        -bs 100 \
-        -t 30 \
-        --dataset $dataset \
-        -ni 200000 \
-        -ef 1000 \
-        -k $k \
-        -l $l \
-        --compile_model \
-        --implementation cuda \
-        --seed $seed \
-        --connections unique &
-
+            # Concurrency Management
+            while [ $(jobs -rp | wc -l) -ge "$max_jobs" ]; do
+                sleep 2
+            done
+        done
     done
-  done
 done
 
 wait
-echo "All experiments finished!"
+echo "All experiments completed."
