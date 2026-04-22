@@ -270,7 +270,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "binary baseline"
+    exp_name = "binary baseline mnist"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
