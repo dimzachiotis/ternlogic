@@ -26,7 +26,7 @@ if top_level_dir not in sys.path:
 from difflogic.difflogic import LogicLayer, GroupSum
 from difflogic.packbitstensor import PackBitsTensor
 from difflogic.compiled_model import CompiledLogicNet
-
+from difflogic.compiled_model_python import CompiledPython
 
 torch.set_num_threads(1)
 
@@ -371,62 +371,85 @@ if __name__ == '__main__':
             # if args.experiment_id is not None:
             #     results.save()
 
-    ####################################################################################################################
-
+    
+    #Ternary Model Python Compilation (Optional)
     if args.compile_model:
         print('\n' + '='*80)
-        print(' Converting the model to C code and compiling it...')
+        print(' Compiling model with Ternary Python...')
         print('='*80)
-
-        for opt_level in range(4):
-
-            for num_bits in [
+        for num_bits in [
                 # 8,
                 # 16,
                 # 32,
                 64
             ]:
-                os.makedirs('lib', exist_ok=True)
-                save_lib_path = 'lib/{:08d}_{}.so'.format(
-                    args.experiment_id if args.experiment_id is not None else 0, num_bits
-                )
-
-                compiled_model = CompiledLogicNet(
-                    model=model,
-                    num_bits=num_bits,
-                    cpu_compiler='gcc',
-                    # cpu_compiler='clang',
-                    verbose=True,
-                )
-
-                compiled_model.compile(
-                    opt_level=1 if args.num_layers * args.num_neurons < 50_000 else 0,
-                    save_lib_path=save_lib_path,
-                    verbose=True
+                #Creates a CompiledPython object
+                compiled_model = CompiledTernaryPython(
+                model=model,
+                verbose=False,
+                num_bits=num_bits,
+                device=device
                 )
 
                 correct, total = 0, 0
                 with torch.no_grad():
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
-                        data = torch.nn.Flatten()(data).round().bool().numpy()
+                        #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
+                        data = torch.nn.Flatten()(data)
+                        data = data.to(device)
+                        labels=labels.to(device)
+                        # ternary quantization to {-1, 0, 1}
+                        data = torch.where(
+                            data < -0.5,-1.0,
+                            torch.where(data > 0.5, 1.0, 0.0)).to(torch.float32)
 
-                        output = compiled_model(data, verbose=True)
+                        #Returns predictions as outputs shape[batch size,number of classes]
+                        output = compiled_model.forward(data)
 
                         correct += (output.argmax(-1) == labels).float().sum()
                         total += output.shape[0]
+                #Accuracy of compiled model
+                tern_acc = correct / total
+                print('COMPILED PYTHON MODEL', num_bits , tern_acc)
 
-                acc3 = correct / total
+                mlflow.log_metric(f"{num_bits}_tern_testing_acc_3", tern_acc)
 
-                mlflow.log_metric(f"{num_bits}_bin_testing_acc", acc3)
+                # #Store Accuracy of python compilation
+                # if args.experiment_id is not None:
+                #     # Ensure results folder exists
+                #     os.makedirs('./results', exist_ok=True)
 
-                print('COMPILED MODEL', num_bits, acc3)
+                #     # Prepare filename
+                #     json_filename = f"./results/{args.experiment_id}_{num_bits}_ternary_3.json"
+
+                #     # If tern_acc is a tensor, convert it to float
+                #     if isinstance(tern_acc, torch.Tensor):
+                #         tern_acc = tern_acc.item()  # gets the scalar value as a float
+
+                #     # Wrap in dict for JSON
+                #     acc_data = {'accuracy': tern_acc}
+
+                #     # Save to JSON
+                #     with open(json_filename, "w") as f:
+                #         json.dump(acc_data, f, indent=4)
+
+                #     print(f"python_ternary_acc saved as JSON: {json_filename}") 
+
         layer_stats, total_stats = compiled_model.gate_statistics()
         final_metrics = {}
         for gate_type, count in total_stats.items():
-            final_metrics[f"total_gate_{gate_type}"] = float(count)
+            final_metrics[f"total_chosen_gate_{gate_type}"] = float(count)
         for i, layer_counter in enumerate(layer_stats):
             for gate_type, count in layer_counter.items():
-                final_metrics[f"L{i}_gate_{gate_type}"] = float(count)
+                final_metrics[f"L{i}_chosen_gate_{gate_type}"] = float(count)
         mlflow.log_metrics(final_metrics, step=args.num_iterations)
 
+        # # Save JSON
+        # os.makedirs('./results', exist_ok=True)
+
+        # json_filename = f"./results/{args.experiment_id}_gate_stats_case_3.json"
+
+        # with open(json_filename, "w") as f:
+        #     json.dump(gate_stats_data, f, indent=4)
+#End the run
 mlflow.end_run()
