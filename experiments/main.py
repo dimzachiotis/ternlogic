@@ -387,8 +387,8 @@ if __name__ == '__main__':
                 compiled_model = CompiledPython(
                 model=model,
                 verbose=False,
-                num_bits=num_bits
-                device=device
+                num_bits=num_bits,
+                device='cuda'
                 )
 
                 correct, total = 0, 0
