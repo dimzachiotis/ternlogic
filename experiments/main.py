@@ -372,10 +372,10 @@ if __name__ == '__main__':
             #     results.save()
 
     
-    #Ternary Model Python Compilation (Optional)
+    #Model Python Compilation (Optional)
     if args.compile_model:
         print('\n' + '='*80)
-        print(' Compiling model with Ternary Python...')
+        print(' Compiling model with Binary Python...')
         print('='*80)
         for num_bits in [
                 # 8,
@@ -384,35 +384,28 @@ if __name__ == '__main__':
                 64
             ]:
                 #Creates a CompiledPython object
-                compiled_model = CompiledTernaryPython(
+                compiled_model = CompiledPython(
                 model=model,
                 verbose=False,
-                num_bits=num_bits,
+                num_bits=num_bits
                 device=device
                 )
 
                 correct, total = 0, 0
                 with torch.no_grad():
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
-                        #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
-                        data = torch.nn.Flatten()(data)
-                        data = data.to(device)
-                        labels=labels.to(device)
-                        # ternary quantization to {-1, 0, 1}
-                        data = torch.where(
-                            data < -0.5,-1.0,
-                            torch.where(data > 0.5, 1.0, 0.0)).to(torch.float32)
-
+                        #flattens the input tensor to 1D per sample and converts the data to boolean values (0 or 1). shape[batch size,product of dimesions of data]
+                        data = torch.nn.Flatten()(data).bool()
                         #Returns predictions as outputs shape[batch size,number of classes]
                         output = compiled_model.forward(data)
 
                         correct += (output.argmax(-1) == labels).float().sum()
                         total += output.shape[0]
                 #Accuracy of compiled model
-                tern_acc = correct / total
-                print('COMPILED PYTHON MODEL', num_bits , tern_acc)
+                python_acc = correct / total
+                print('COMPILED PYTHON MODEL', num_bits , python_acc)
 
-                mlflow.log_metric(f"{num_bits}_tern_testing_acc_3", tern_acc)
+                mlflow.log_metric(f"{num_bits}_bin_python_acc", python_acc)
 
                 # #Store Accuracy of python compilation
                 # if args.experiment_id is not None:
