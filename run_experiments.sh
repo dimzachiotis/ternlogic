@@ -30,7 +30,7 @@ for seed in "${seeds[@]}"; do
 
             # Command string
             cmd="python experiments/main.py \
-                -bs 100 -t 30 --dataset mnist -ni 200000 -ef 1000 \
+                -bs 100 -t 30 --dataset mnist20x20 -ni 200000 -ef 1000 \
                 -k $k -l $l --compile_model --implementation cuda \
                 --seed $seed --connections unique"
 
