@@ -2,7 +2,7 @@
 
 # Configuration
 seeds=(0 1 2)
-k_values=(64000 32000 16000 8000)
+k_values=(64000 32000 16000 8000 4000 2000)
 l_values=(1 2 4 6)
 LOG_DIR="./logs"
 mkdir -p "$LOG_DIR"
@@ -22,7 +22,7 @@ for seed in "${seeds[@]}"; do
             elif [ "$kl" -ge $((16000 * 6)) ]; then
                 max_jobs=4
             else
-                max_jobs=8
+                max_jobs=6
             fi
 
             # Define log file for this specific separate bash
