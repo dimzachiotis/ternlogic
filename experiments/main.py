@@ -388,7 +388,7 @@ if __name__ == '__main__':
                 model=model,
                 verbose=False,
                 num_bits=num_bits,
-                device='cuda'
+                device='cpu'
                 )
 
                 correct, total = 0, 0
@@ -396,8 +396,8 @@ if __name__ == '__main__':
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
                         #flattens the input tensor to 1D per sample and converts the data to boolean values (0 or 1). shape[batch size,product of dimesions of data]
                         data = torch.nn.Flatten()(data)
-                        data = data.to('cuda')
-                        labels=labels.to('cuda')
+                        data = data.to('cpu')
+                        labels=labels.to('cpu')
                         #Returns predictions as outputs shape[batch size,number of classes]
                         output = compiled_model.forward(data)
 
