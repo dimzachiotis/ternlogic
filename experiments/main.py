@@ -396,7 +396,7 @@ if __name__ == '__main__':
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
                         #flattens the input tensor to 1D per sample and converts the data to boolean values (0 or 1). shape[batch size,product of dimesions of data]
                         data = torch.nn.Flatten()(data)
-                        data = data.to('cpu')
+                        data = data.to('cpu').round().bool()
                         labels=labels.to('cpu')
                         #Returns predictions as outputs shape[batch size,number of classes]
                         output = compiled_model.forward(data)
