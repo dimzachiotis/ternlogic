@@ -270,7 +270,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "binary baseline mnist20x20"
+    exp_name = "binary baseline mnist"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
@@ -407,7 +407,7 @@ if __name__ == '__main__':
                 python_acc = correct / total
                 print('COMPILED PYTHON MODEL', num_bits , python_acc)
 
-                mlflow.log_metric(f"{num_bits}_bin_python_acc", python_acc)
+                mlflow.log_metric(f"{num_bits}_bin_testing_acc", python_acc)
 
                 # #Store Accuracy of python compilation
                 # if args.experiment_id is not None:
