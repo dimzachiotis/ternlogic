@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "tern logic net"
+    exp_name = "ternary search mnist group1 "
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
@@ -409,6 +409,7 @@ if __name__ == '__main__':
     mlflow.log_param("loss_type", loss_fn.__class__.__name__)
     mlflow.log_param("optimizer_type", optim.__class__.__name__)
     mlflow.log_param("logic_type", "ternary")
+    mlflow.log_param("total_neurons", args.num_neurons*args.num_layers)
 
     gates_used=['0','1','2','3','4','5','6','7','8','9','10','11','12']
     mlflow.log_param("gate_types_used", ", ".join(gates_used))
