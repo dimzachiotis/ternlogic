@@ -1,7 +1,6 @@
 build_main_new/
-difflogic_cuda.cpython-310-x86_64-linux-gnu.so
 experiments/__pycache__/
-ternlogic_cuda.cpython-310-x86_64-linux-gnu.so
+build_tern/
 data-mnist/
 difflogic/__pycache__/
 lib/
