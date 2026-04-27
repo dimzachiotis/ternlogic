@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "ternary search mnist group1 "
+    exp_name = "ternary search grad factor"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
@@ -380,7 +380,7 @@ if __name__ == '__main__':
         mlflow.set_experiment(exp_name)    
 
     #Gives your run a readable name.
-    mlflow.start_run(run_name=f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tern")
+    mlflow.start_run(run_name=f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tau{args.tau}_gradfactor{args.grad_factor}_tern")
     
     #creates arg object
     ####################################################################################################################
@@ -521,7 +521,7 @@ if __name__ == '__main__':
                 model=model,
                 verbose=False,
                 num_bits=num_bits,
-                device=device
+                device='cpu'
                 )
 
                 correct, total = 0, 0
@@ -529,8 +529,8 @@ if __name__ == '__main__':
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
                         #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
                         data = torch.nn.Flatten()(data)
-                        data = data.to(device)
-                        labels=labels.to(device)
+                        data = data.to('cpu')
+                        labels=labels.to('cpu')
                         # ternary quantization to {-1, 0, 1}
                         data = torch.where(
                             data < -0.5,-1.0,
