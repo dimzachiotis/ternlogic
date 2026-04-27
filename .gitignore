@@ -24,8 +24,6 @@ lib/
 
 mlflow.db
 build/
-ternlogic_cuda.cpython-310-x86_64-linux-gnu.so
-difflogic_cuda.cpython-310-x86_64-linux-gnu.so
 
 build_main_new/
 build_tern/
