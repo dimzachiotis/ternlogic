@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "ternary search grad factor"
+    exp_name = "ternary search lr"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
