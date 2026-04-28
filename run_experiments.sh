@@ -30,7 +30,7 @@ for sd in "${seeds[@]}"; do
 
             for lr in "${lr_val[@]}"; do
 
-                llog_file="$LOG_DIR/seed${sd}_k${k}_l${l}_lr${lr}.log"
+                log_file="$LOG_DIR/seed${sd}_k${k}_l${l}_lr${lr}.log"
 
                 cmd="python experiments/main.py \
                     -bs 100 -t $tau_val --dataset mnist -ni 200000 -ef 1000 \
