@@ -6,9 +6,11 @@ import os
 
 # --- Configuration ---
 output_dir = "/home/dzachiotis/thesis/graphs/"
-filename = "ternary_vs_binary_comparison.png"
+filename = "group1_vs_binary.png"
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
+
+full_path = os.path.join(output_dir, filename)
 
 mlflow.set_tracking_uri("sqlite:////home/dzachiotis/thesis/mlflow_shared/mlflow.db")
 client = MlflowClient()
@@ -27,7 +29,6 @@ def get_best_frontier(exp_name, metric_name, target_lr=None):
         p = run.data.params
         m = run.data.metrics
         
-        # Calculate total neurons (kl)
         k = int(p.get('num_neurons', 0))
         l = int(p.get('num_layers', 0))
         
@@ -38,8 +39,6 @@ def get_best_frontier(exp_name, metric_name, target_lr=None):
         })
     
     df = pd.DataFrame(records)
-    
-    # Filter by LR if specified (for the ternary experiment)
     if target_lr is not None:
         df = df[df['lr'] == target_lr]
     
@@ -51,41 +50,64 @@ def get_best_frontier(exp_name, metric_name, target_lr=None):
     return summary.loc[idx].sort_values('kl')
 
 # --- 1. Process Data ---
-# Ternary: Only LR 0.01
 frontier_tern = get_best_frontier("ternary search lr", "64_tern_testing_acc_3", target_lr=0.01)
-
-# Binary: Baseline (no LR filter needed based on your snippet)
 frontier_bin = get_best_frontier("binary baseline mnist", "64_bin_testing_acc")
 
-# --- 2. Visualization (Subplots) ---
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 8), sharey=True)
+# --- 2. Create the Combined Plot ---
+fig, ax = plt.subplots(figsize=(14, 9))
 
-def plot_frontier(ax, data, title, color):
-    ax.plot(data['kl'], data['mean'], marker='o', linestyle='-', color=color, linewidth=2, markersize=8)
-    ax.errorbar(data['kl'], data['mean'], yerr=data['std'], fmt='none', ecolor='gray', alpha=0.4)
-    
-    # Annotate architectures
-    for _, row in data.iterrows():
-        ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
-                    (row['kl'], row['mean']), 
-                    textcoords="offset points", xytext=(0,10), 
-                    ha='center', fontsize=9, fontweight='bold')
-    
-    ax.set_xscale('log')
-    ax.set_title(title, fontsize=14, pad=15)
-    ax.set_xlabel('Total Neurons ($k \\times l$)', fontsize=12)
-    ax.grid(True, linestyle='--', alpha=0.6, which='both')
+# Scatter Ternary (Circles)
+ax.scatter(
+    frontier_tern['kl'], 
+    frontier_tern['mean'], 
+    color='#1f77b4', 
+    marker='o', 
+    s=120, 
+    label='Ternary Search (LR=0.01)', 
+    edgecolors='black', 
+    zorder=3
+)
 
-# Plot left: Ternary
-plot_frontier(ax1, frontier_tern, "Ternary Search Frontier (LR=0.01)", "#2980b9")
-ax1.set_ylabel('Mean Test Accuracy', fontsize=12)
+# Scatter Binary (Squares)
+ax.scatter(
+    frontier_bin['kl'], 
+    frontier_bin['mean'], 
+    color='#d62728', 
+    marker='s', 
+    s=100, 
+    label='Binary Baseline', 
+    edgecolors='black', 
+    alpha=0.8,
+    zorder=3
+)
 
-# Plot right: Binary
-plot_frontier(ax2, frontier_bin, "Binary Baseline Frontier", "#c0392b")
+# --- 3. Annotations ---
+# Offsetting Ternary labels UP and Binary labels DOWN to prevent overlap
+for _, row in frontier_tern.iterrows():
+    ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+                (row['kl'], row['mean']), 
+                textcoords="offset points", xytext=(0, 12), 
+                ha='center', fontsize=9, color='#1f77b4', fontweight='bold')
 
-plt.suptitle("Architecture Efficiency: Ternary vs. Binary Baselines", fontsize=18, y=1.02)
+for _, row in frontier_bin.iterrows():
+    ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+                (row['kl'], row['mean']), 
+                textcoords="offset points", xytext=(0, -18), 
+                ha='center', fontsize=9, color='#d62728', fontweight='bold')
+
+# --- 4. Formatting ---
+ax.set_xscale('log')
+ax.set_xlabel('Total Neurons ($k \\times l$)', fontsize=13)
+ax.set_ylabel('Mean Test Accuracy', fontsize=13)
+ax.set_title('Efficiency Frontier: Ternary vs. Binary (Best Architecture Points)', fontsize=16, pad=20)
+ax.grid(True, which='both', linestyle='--', alpha=0.4)
+ax.legend(loc='lower right', fontsize=12)
+
+# Adjust limits to ensure all annotations fit
+ax.set_ylim(min(frontier_bin['mean'].min(), frontier_tern['mean'].min()) - 0.05, 1.0)
+
 plt.tight_layout()
-plt.savefig(os.path.join(output_dir, filename), dpi=200, bbox_inches='tight')
+plt.savefig(full_path, dpi=200)
 plt.show()
 
-print("Processing complete. Comparison graph saved.")
+print(f"Combined scatter plot saved to: {full_path}")
