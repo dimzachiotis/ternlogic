@@ -51,7 +51,9 @@ def get_all_architectures(exp_name, metric_name, target_lr=None):
 
 # --- 1. Get Data (All points, no filtering for max) ---
 all_group1 = get_all_architectures("ternary search lr", "64_tern_testing_acc_3", target_lr=target_lr)
+print(all_group1)
 all_group1_1 = get_all_architectures("group1_1", "64_tern_testing_acc_3", target_lr=target_lr)
+print(all_group1_1)
 all_bin = get_all_architectures("binary baseline mnist", "64_bin_testing_acc")
 
 # --- 2. Create Scatter Plot ---
