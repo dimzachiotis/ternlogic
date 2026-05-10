@@ -6,7 +6,7 @@ import os
 
 # --- Configuration ---
 output_dir = "/home/dzachiotis/thesis/graphs/"
-filename = "group1_vs_bin_points.png"
+filename = "group1_vs_gorup1_1_vs_bin_points.png"
 target_lr = 0.01
 
 if not os.path.exists(output_dir):
@@ -50,16 +50,22 @@ def get_all_architectures(exp_name, metric_name, target_lr=None):
     return summary.sort_values('kl')
 
 # --- 1. Get Data (All points, no filtering for max) ---
-all_tern = get_all_architectures("ternary search lr", "64_tern_testing_acc_3", target_lr=target_lr)
+all_group1 = get_all_architectures("ternary search lr", "64_tern_testing_acc_3", target_lr=target_lr)
+all_group1_1 = get_all_architectures("group1_1", "64_tern_testing_acc_3", target_lr=target_lr)
 all_bin = get_all_architectures("binary baseline mnist", "64_bin_testing_acc")
 
 # --- 2. Create Scatter Plot ---
 fig, ax = plt.subplots(figsize=(14, 9))
 
-# Scatter Ternary
-ax.scatter(all_tern['kl'], all_tern['mean_acc'], 
-           label=f'Ternary Architectures (LR={target_lr})', 
+# Scatter Ternary Group 1
+ax.scatter(all_group1['kl'], all_group1['mean_acc'], 
+           label='Ternary Group 1',  # Unique Label
            color='#1f77b4', marker='o', s=100, alpha=0.7, edgecolors='black')
+
+# Scatter Ternary Group 1.1
+ax.scatter(all_group1_1['kl'], all_group1_1['mean_acc'], 
+           label='Ternary Group 1.1', # Unique Label
+           color="#30b41f", marker='<', s=100, alpha=0.7, edgecolors='black')
 
 # Scatter Binary
 ax.scatter(all_bin['kl'], all_bin['mean_acc'], 
@@ -68,11 +74,17 @@ ax.scatter(all_bin['kl'], all_bin['mean_acc'],
 
 # --- 3. Annotations ---
 # Labeling every point with its (k, l)
-for _, row in all_tern.iterrows():
+for _, row in all_group1.iterrows():
     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
                 (row['kl'], row['mean_acc']), 
                 textcoords="offset points", xytext=(0, 10), 
                 ha='center', fontsize=8, color='#1f77b4')
+    
+for _, row in all_group1_1.iterrows():
+    ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+                (row['kl'], row['mean_acc']), 
+                textcoords="offset points", xytext=(10, 5), # Shifted slightly right/up
+                ha='left', fontsize=8, color="#30b41f")
 
 for _, row in all_bin.iterrows():
     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
@@ -89,7 +101,7 @@ ax.grid(True, which='both', linestyle='--', alpha=0.4)
 ax.legend(loc='lower right', fontsize=12)
 
 # Adjust Y-axis to see the spread clearly
-ax.set_ylim(min(all_bin['mean_acc'].min(), all_tern['mean_acc'].min()) - 0.05, 1.0)
+ax.set_ylim(min(all_bin['mean_acc'].min(), all_group1['mean_acc'].min()) - 0.05, 1.0)
 
 plt.tight_layout()
 plt.savefig(full_path, dpi=200)
