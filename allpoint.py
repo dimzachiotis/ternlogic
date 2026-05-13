@@ -6,7 +6,7 @@ import os
 
 # --- Configuration ---
 output_dir = "/home/dzachiotis/thesis/graphs/"
-filename = "group1_3_vs_group1_4_vs_bin_points.png"
+filename = "group1_4_vs_group1_5_vs_bin_points.png"
 target_lr = 0.01
 
 if not os.path.exists(output_dir):
@@ -50,10 +50,10 @@ def get_all_architectures(exp_name, metric_name, target_lr=None):
     return summary.sort_values('kl')
 
 # --- 1. Get Data (All points, no filtering for max) ---
+all_group1_5 = get_all_architectures("group1_5", "64_tern_testing_acc_3", target_lr=target_lr)
+print(all_group1_5)
 all_group1_4 = get_all_architectures("group1_4", "64_tern_testing_acc_3", target_lr=target_lr)
 print(all_group1_4)
-all_group1_3 = get_all_architectures("group1_3", "64_tern_testing_acc_3", target_lr=target_lr)
-print(all_group1_3)
 all_bin = get_all_architectures("binary baseline mnist", "64_bin_testing_acc")
 print(all_bin)
 
@@ -65,8 +65,8 @@ ax.scatter(all_group1_4['kl'], all_group1_4['mean_acc'],
            color="#b41f82", marker='>', s=100, alpha=0.7, edgecolors='black')
 
 # Scatter Ternary Group 1
-ax.scatter(all_group1_3['kl'], all_group1_3['mean_acc'], 
-           label='Ternary Group 1.3',  # Unique Label
+ax.scatter(all_group1_5['kl'], all_group1_5['mean_acc'], 
+           label='Ternary Group 1.5',  # Unique Label
            color='#1f77b4', marker='o', s=100, alpha=0.7, edgecolors='black')
 
 # Scatter Binary
@@ -82,7 +82,7 @@ for _, row in all_group1_4.iterrows():
                 textcoords="offset points", xytext=(10, 5), 
                 ha='left', fontsize=8, color="#b41f82")
 
-for _, row in all_group1_3.iterrows():
+for _, row in all_group1_5.iterrows():
     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
                 (row['kl'], row['mean_acc']), 
                 textcoords="offset points", xytext=(0, 10), 
@@ -103,7 +103,7 @@ ax.grid(True, which='both', linestyle='--', alpha=0.4)
 ax.legend(loc='lower right', fontsize=12)
 
 # Adjust Y-axis to see the spread clearly
-ax.set_ylim(min(all_bin['mean_acc'].min(), all_group1_3['mean_acc'].min()) - 0.05, 1.0)
+ax.set_ylim(min(all_bin['mean_acc'].min(), all_group1_4['mean_acc'].min()) - 0.05, 1.0)
 
 plt.tight_layout()
 plt.savefig(full_path, dpi=200)
