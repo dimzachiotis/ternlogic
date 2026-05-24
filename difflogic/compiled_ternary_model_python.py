@@ -146,7 +146,7 @@ class CompiledTernaryPython(torch.nn.Module):
         total_area_2inputs=0
 
         for gate_type, count in total_stats.items():
-            total_area_2inputs=total_area_2inputs + count*area.get(gates_used[gate_type])
+            total_area_2inputs=total_area_2inputs + count*area.get(gates_used[gate_type],0)
 
         return  total_area_2inputs
     
@@ -159,7 +159,7 @@ class CompiledTernaryPython(torch.nn.Module):
         total_area_mul_inputs=0
 
         for gate_type, count in total_stats.items():
-            total_area_mul_inputs=total_area_mul_inputs + count*area.get(gates_used[gate_type])
+            total_area_mul_inputs=total_area_mul_inputs + count*area.get(gates_used[gate_type],0)
 
         return  total_area_mul_inputs
       
