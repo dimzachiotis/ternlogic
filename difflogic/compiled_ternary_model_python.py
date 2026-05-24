@@ -163,3 +163,113 @@ class CompiledTernaryPython(torch.nn.Module):
 
         return  total_area_mul_inputs
       
+    def network_depth_2inputs(self,gates_used):
+        depth={'0':0,'1':0 ,'2':0 ,'3':0 ,'4':0 ,'5':4 ,'6':4 ,'7':0 ,'8':1 ,'9':1 ,'10':1 ,'11':1 , 
+              '12':0 ,'13':1 ,'14':1 ,'15':1 ,'16':1 ,'17':2 ,'18':2 ,'19':2 ,'20':2 ,'21':2 ,'22':2 ,
+              '23':3 ,'24':3 ,'25':3 ,'26':3 ,'27':2 ,'28':2 ,'29':2 ,'30':2 ,'31':2 ,'32':4 ,'33':4 ,
+              '34':2 ,'35':2 ,'36':4 ,'37':4 ,'38':4 ,'39':4 ,'40':5 ,'41':5 ,'42':6 ,'43':6 ,'44':5 ,
+              '45':5 }
+        
+        num_layers = len(self.layers)
+        #num of layers
+        if num_layers == 0:
+            return 0
+
+        last_layer_a, _, _ = self.layers[-1]
+        num_outputs = len(last_layer_a)
+        #num of gates each layer has
+        current_depths = [0] * num_outputs
+        #list of zeros, size of num_outputs
+
+        for l in range(num_layers - 1, -1, -1):
+            #reverse loop across layers
+            layer_a, layer_b, layer_op = self.layers[l]
+            #current layer l
+            # layer_a indices for input wire A
+            # layer_b indices for input wire B
+            # layer_op chosen hard logic gate IDs for every neuron in this layer.
+            num_neurons = len(layer_a)
+
+            max_input_idx = 0
+            #how many output slots the previous layer must have
+            if num_neurons > 0:
+                max_a = int(torch.max(layer_a).item())
+                max_b = int(torch.max(layer_b).item())
+                max_input_idx = max(max_a, max_b)
+            
+            prev_depths = [0] * (max_input_idx + 1)
+            #collection bin, storing the critical path accumulations that we bubble backward to the driving parent nodes in the preceding layer.
+
+            for i in range(num_neurons):
+                #nested loop iterating through every single logic gate neuron i in the current layer.
+                gate_type = gates_used[int(layer_op[i].item())]
+                gate_delay = depth.get(gate_type, 0)
+                
+                total_delay = current_depths[i] + gate_delay
+                
+                p1 = int(layer_a[i].item())
+                p2 = int(layer_b[i].item())
+                
+                if total_delay > prev_depths[p1]:
+                    prev_depths[p1] = total_delay
+                if total_delay > prev_depths[p2]:
+                    prev_depths[p2] = total_delay
+
+            current_depths = prev_depths
+
+        return int(max(current_depths))
+
+    def network_depth_mul_inputs(self,gates_used):
+        depth={'0':0 ,'1':0 ,'2':0 ,'3':0 ,'4':0 ,'5':2 ,'6':2 ,'7':0 ,'8':1 ,'9':1 ,'10':1 ,'11':1 , 
+              '12':0 ,'13':1 ,'14':1 ,'15':1 ,'16':1 ,'17':1 ,'18':1 ,'19':1 ,'20':1 ,'21':2 ,'22':2 ,
+              '23':2 ,'24':2 ,'25':2 ,'26':2 ,'27':1 ,'28':1 ,'29':1 ,'30':1 ,'31':1 ,'32':1 ,'33':1 ,
+              '34':2 ,'35':2 ,'36':3 ,'37':3 ,'38':3 ,'39':3 ,'40':4 ,'41':4 ,'42':4 ,'43':4 ,'44':4 ,
+              '45':4 }
+        
+        num_layers = len(self.layers)
+        if num_layers == 0: return 0
+
+        last_layer_a, _, _ = self.layers[-1]
+        current_depths = [0] * len(last_layer_a)
+
+        for l in range(num_layers - 1, -1, -1):
+            layer_a, layer_b, layer_op = self.layers[l]
+            num_neurons = len(layer_a)
+
+            max_input_idx = 0
+            if num_neurons > 0:
+                max_input_idx = max(int(torch.max(layer_a).item()), int(torch.max(layer_b).item()))
+            
+            prev_depths = [0] * (max_input_idx + 1)
+
+            for i in range(num_neurons):
+                gate_type = gates_used[int(layer_op[i].item())]
+                gate_delay = depth.get(gate_type, 0)
+                total_delay = current_depths[i] + gate_delay
+                
+                p1, p2 = int(layer_a[i].item()), int(layer_b[i].item())
+                if total_delay > prev_depths[p1]: prev_depths[p1] = total_delay
+                if total_delay > prev_depths[p2]: prev_depths[p2] = total_delay
+
+            current_depths = prev_depths
+
+        return int(max(current_depths))
+
+    # def network_delay_2inputs(self):
+    #     depth={'0': ,'1': ,'2': ,'3': ,'4': ,'5': ,'6': ,'7': ,'8': ,'9': ,'10': ,'11': , 
+    #           '12': ,'13': ,'14': ,'15': ,'16': ,'17': ,'18': ,'19': ,'20': ,'21': ,'22': ,
+    #           '23': ,'24': ,'25': ,'26': ,'27': ,'28': ,'29': ,'30': ,'31': ,'32': ,'33': ,
+    #           '34': ,'35': ,'36': ,'37': ,'38': ,'39': ,'40': ,'41': ,'42': ,'43': ,'44': ,
+    #           '45': }
+        
+    #     total_delay_2inputs=0
+
+    # def network_delay_mul_inputs(self):
+    #     depth={'0': ,'1': ,'2': ,'3': ,'4': ,'5': ,'6': ,'7': ,'8': ,'9': ,'10': ,'11': , 
+    #           '12': ,'13': ,'14': ,'15': ,'16': ,'17': ,'18': ,'19': ,'20': ,'21': ,'22': ,
+    #           '23': ,'24': ,'25': ,'26': ,'27': ,'28': ,'29': ,'30': ,'31': ,'32': ,'33': ,
+    #           '34': ,'35': ,'36': ,'37': ,'38': ,'39': ,'40': ,'41': ,'42': ,'43': ,'44': ,
+    #           '45': }
+        
+    #     total_delay_mul_inputs=0
+
