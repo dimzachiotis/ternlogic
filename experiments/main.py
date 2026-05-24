@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "test_area"
+    exp_name = "test_depth"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
@@ -582,6 +582,12 @@ if __name__ == '__main__':
 
         areamulinputs=compiled_model.network_area_mul_inputs(gates_used,total_stats)
         mlflow.log_param("area_mul_inputs", areamulinputs)
+
+        depth2inputs=compiled_model.network_depth_2inputs(gates_used)
+        mlflow.log_param("depth_2inputs", depth2inputs)
+
+        depthmulinputs=compiled_model.network_depth_mul_inputs(gates_used)
+        mlflow.log_param("depth_mul_inputs", depthmulinputs)
 
 
         # # Save JSON
