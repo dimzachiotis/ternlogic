@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "ternary search lr"
+    exp_name = "test_area"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
@@ -576,6 +576,13 @@ if __name__ == '__main__':
             for gate_type, count in layer_counter.items():
                 final_metrics[f"L{i}_chosen_gate_{gate_type}"] = float(count)
         mlflow.log_metrics(final_metrics, step=args.num_iterations)
+
+        area2inputs=compiled_model.network_area_2inputs(gates_used,total_stats)
+        mlflow.log_param("area_2inputs", area2inputs)
+
+        areamulinputs=compiled_model.network_area_mul_inputs(gates_used,total_stats)
+        mlflow.log_param("area_mul_inputs", areamulinputs)
+
 
         # # Save JSON
         # os.makedirs('./results', exist_ok=True)
