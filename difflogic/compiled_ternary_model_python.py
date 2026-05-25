@@ -205,15 +205,15 @@ class CompiledTernaryPython(torch.nn.Module):
                 gate_type = gates_used[int(layer_op[i].item())]
                 gate_delay = depth.get(gate_type, 0)
                 
-                total_delay = current_depths[i] + gate_delay
+                total_depth = current_depths[i] + gate_delay
                 
                 p1 = int(layer_a[i].item())
                 p2 = int(layer_b[i].item())
                 
-                if total_delay > prev_depths[p1]:
-                    prev_depths[p1] = total_delay
-                if total_delay > prev_depths[p2]:
-                    prev_depths[p2] = total_delay
+                if total_depth > prev_depths[p1]:
+                    prev_depths[p1] = total_depth
+                if total_depth > prev_depths[p2]:
+                    prev_depths[p2] = total_depth
 
             current_depths = prev_depths
 
@@ -245,31 +245,85 @@ class CompiledTernaryPython(torch.nn.Module):
             for i in range(num_neurons):
                 gate_type = gates_used[int(layer_op[i].item())]
                 gate_delay = depth.get(gate_type, 0)
-                total_delay = current_depths[i] + gate_delay
+                total_depth = current_depths[i] + gate_delay
                 
                 p1, p2 = int(layer_a[i].item()), int(layer_b[i].item())
-                if total_delay > prev_depths[p1]: prev_depths[p1] = total_delay
-                if total_delay > prev_depths[p2]: prev_depths[p2] = total_delay
+                if total_depth > prev_depths[p1]: prev_depths[p1] = total_depth
+                if total_depth > prev_depths[p2]: prev_depths[p2] = total_depth
 
             current_depths = prev_depths
 
         return int(max(current_depths))
 
-    # def network_delay_2inputs(self):
-    #     depth={'0': ,'1': ,'2': ,'3': ,'4': ,'5': ,'6': ,'7': ,'8': ,'9': ,'10': ,'11': , 
-    #           '12': ,'13': ,'14': ,'15': ,'16': ,'17': ,'18': ,'19': ,'20': ,'21': ,'22': ,
-    #           '23': ,'24': ,'25': ,'26': ,'27': ,'28': ,'29': ,'30': ,'31': ,'32': ,'33': ,
-    #           '34': ,'35': ,'36': ,'37': ,'38': ,'39': ,'40': ,'41': ,'42': ,'43': ,'44': ,
-    #           '45': }
+    def network_delay_2inputs(self,gates_used):
+        delay={'0':0 ,'1':0 ,'2':0 ,'3':0 ,'4':0 ,'5':758 ,'6':758 ,'7':0 ,'8':120 ,'9':120 ,'10':120 ,'11':120 , 
+              '12':0 ,'13':127 ,'14':127 ,'15':127 ,'16':127 ,'17':302 ,'18':302 ,'19':302 ,'20':302 ,'21':320 ,'22':320 ,
+              '23':499 ,'24':499 ,'25':426 ,'26':426 ,'27':244 ,'28':244 ,'29':244 ,'30':244 ,'31':361 ,'32':786 ,'33':786 ,
+              '34':462 ,'35':462 ,'36':773 ,'37':773 ,'38':786 ,'39':786 ,'40':895 ,'41':895 ,'42':1158 ,'43':1158 ,'44':946 ,
+              '45':946 }
         
-    #     total_delay_2inputs=0
+        num_layers = len(self.layers)
+        if num_layers == 0: return 0
 
-    # def network_delay_mul_inputs(self):
-    #     depth={'0': ,'1': ,'2': ,'3': ,'4': ,'5': ,'6': ,'7': ,'8': ,'9': ,'10': ,'11': , 
-    #           '12': ,'13': ,'14': ,'15': ,'16': ,'17': ,'18': ,'19': ,'20': ,'21': ,'22': ,
-    #           '23': ,'24': ,'25': ,'26': ,'27': ,'28': ,'29': ,'30': ,'31': ,'32': ,'33': ,
-    #           '34': ,'35': ,'36': ,'37': ,'38': ,'39': ,'40': ,'41': ,'42': ,'43': ,'44': ,
-    #           '45': }
+        last_layer_a, _, _ = self.layers[-1]
+        current_delays = [0] * len(last_layer_a)
+
+        for l in range(num_layers - 1, -1, -1):
+            layer_a, layer_b, layer_op = self.layers[l]
+            num_neurons = len(layer_a)
+
+            max_input_idx = 0
+            if num_neurons > 0:
+                max_input_idx = max(int(torch.max(layer_a).item()), int(torch.max(layer_b).item()))
+            
+            prev_delays = [0] * (max_input_idx + 1)
+
+            for i in range(num_neurons):
+                gate_type = gates_used[int(layer_op[i].item())]
+                gate_delay = delay.get(gate_type, 0)
+                total_delay = current_delays[i] + gate_delay
+                
+                p1, p2 = int(layer_a[i].item()), int(layer_b[i].item())
+                if total_delay > prev_delays[p1]: prev_delays[p1] = total_delay
+                if total_delay > prev_delays[p2]: prev_delays[p2] = total_delay
+
+            current_delays = prev_delays
+
+        return int(max(current_delays))
         
-    #     total_delay_mul_inputs=0
 
+    def network_delay_mul_inputs(self,gates_used):
+        delay={'0':0 ,'1':0 ,'2':0 ,'3':0 ,'4':0 ,'5':504 ,'6':504 ,'7':0 ,'8':120 ,'9':120 ,'10':120 ,'11':120 , 
+              '12':0 ,'13':127 ,'14':127 ,'15':127 ,'16':127 ,'17':116 ,'18':116 ,'19':116 ,'20':116 ,'21':176 ,'22':176 ,
+              '23':414 ,'24':414 ,'25':357 ,'26':357 ,'27':116 ,'28':116 ,'29':116 ,'30':116 ,'31':202 ,'32':241 ,'33':241 ,
+              '34':464 ,'35':464 ,'36':291 ,'37':291 ,'38':291 ,'39':291 ,'40':681 ,'41':681 ,'42':746 ,'43':746 ,'44':746 ,
+              '45':746 }
+        
+        num_layers = len(self.layers)
+        if num_layers == 0: return 0
+
+        last_layer_a, _, _ = self.layers[-1]
+        current_delays = [0] * len(last_layer_a)
+
+        for l in range(num_layers - 1, -1, -1):
+            layer_a, layer_b, layer_op = self.layers[l]
+            num_neurons = len(layer_a)
+
+            max_input_idx = 0
+            if num_neurons > 0:
+                max_input_idx = max(int(torch.max(layer_a).item()), int(torch.max(layer_b).item()))
+            
+            prev_delays = [0] * (max_input_idx + 1)
+
+            for i in range(num_neurons):
+                gate_type = gates_used[int(layer_op[i].item())]
+                gate_delay = delay.get(gate_type, 0)
+                total_delay = current_delays[i] + gate_delay
+                
+                p1, p2 = int(layer_a[i].item()), int(layer_b[i].item())
+                if total_delay > prev_delays[p1]: prev_delays[p1] = total_delay
+                if total_delay > prev_delays[p2]: prev_delays[p2] = total_delay
+
+            current_delays = prev_delays
+
+        return int(max(current_delays))
