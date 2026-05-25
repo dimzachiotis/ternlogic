@@ -365,7 +365,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "test_depth"
+    exp_name = "test_delay"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
@@ -589,7 +589,11 @@ if __name__ == '__main__':
         depthmulinputs=compiled_model.network_depth_mul_inputs(gates_used)
         mlflow.log_param("depth_mul_inputs", depthmulinputs)
 
+        delay2inputs=compiled_model.network_delay_2inputs(gates_used)
+        mlflow.log_param("delay_2inputs", delay2inputs)
 
+        delaymulinputs=compiled_model.network_delay_mul_inputs(gates_used)
+        mlflow.log_param("delay_mul_inputs", delaymulinputs)
         # # Save JSON
         # os.makedirs('./results', exist_ok=True)
 
