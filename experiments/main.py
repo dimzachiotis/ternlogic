@@ -368,7 +368,7 @@ if __name__ == '__main__':
 
     #Start an MLflow run
     ####################################################################################################################
-    exp_name = "test_delay"
+    exp_name = "test_2inputs"
 
     # Check if the experiment exists
     experiment = mlflow.get_experiment_by_name(exp_name)
@@ -615,8 +615,13 @@ if __name__ == '__main__':
                 # 32,
                 64
             ]:
+                os.makedirs('lib', exist_ok=True)
+                save_lib_path = 'lib/{:08d}_{}_binary_2inputs.so'.format(
+                    args.experiment_id if args.experiment_id is not None else 0, num_bits
+                )
+
                 #Creates a CompiledPython object
-                compiled_model = CompiledTernaryBinaryNet2Inputs(
+                compiled_binary = CompiledTernaryBinaryNet2Inputs(
                 model=model,
                 verbose=False,
                 num_bits=num_bits,
@@ -625,6 +630,11 @@ if __name__ == '__main__':
                 gates_used=gates_used
                 )
 
+                compiled_binary.compile(
+                    opt_level=1 if args.num_layers * args.num_neurons < 50_000 else 0,
+                    save_lib_path=save_lib_path,
+                    verbose=False
+                )
                 correct, total = 0, 0
                 with torch.no_grad():
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
@@ -638,7 +648,7 @@ if __name__ == '__main__':
                             torch.where(data > 0.5, 1.0, 0.0)).to(torch.float32)
 
                         #Returns predictions as outputs shape[batch size,number of classes]
-                        output = compiled_model.forward(data)
+                        output = compiled_binary.forward(data)
 
                         correct += (output.argmax(-1) == labels).float().sum()
                         total += output.shape[0]
