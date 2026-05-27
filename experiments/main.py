@@ -35,6 +35,7 @@ from difflogic.difflogic import LogicLayer, GroupSum
 from difflogic.packbitstensor import PackTernaryTensor
 from difflogic.compiled_model import CompiledLogicNet
 from difflogic.compiled_ternary_model_python import CompiledTernaryPython
+from difflogic.compiled_ternary_to_binary_2inputs import CompiledTernaryBinaryNet2Inputs
 
 device ='cuda'
 #if no cuda available, then use cpu
@@ -346,7 +347,9 @@ if __name__ == '__main__':
 
     parser.add_argument('--packtern_eval', action='store_true', help='Use the PackTernaryTensor implementation for an '
                                                                      'additional eval step.')
-    parser.add_argument('--compile_model', action='store_true', help='Compile the final model with C for CPU.')
+    parser.add_argument('--compile_model', action='store_true', help='Compile the final model with Python.')
+
+    parser.add_argument('--compile_binary', action='store_true', help='Compile the final model with C.')
 
     parser.add_argument('--num-iterations', '-ni', type=int, default=100_000, help='Number of iterations (default: 100_000)')
     parser.add_argument('--eval-freq', '-ef', type=int, default=2_000, help='Evaluation frequency (default: 2_000)')
@@ -601,5 +604,49 @@ if __name__ == '__main__':
 
         # with open(json_filename, "w") as f:
         #     json.dump(gate_stats_data, f, indent=4)
+
+    if args.compile_binary:
+        print('\n' + '='*80)
+        print(' Compiling model to Binary 2inputs...')
+        print('='*80)
+        for num_bits in [
+                # 8,
+                # 16,
+                # 32,
+                64
+            ]:
+                #Creates a CompiledPython object
+                compiled_model = CompiledTernaryBinaryNet2Inputs(
+                model=model,
+                verbose=False,
+                num_bits=num_bits,
+                cpu_compiler='gcc',
+                device='cpu',
+                gates_used=gates_used
+                )
+
+                correct, total = 0, 0
+                with torch.no_grad():
+                    for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
+                        #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
+                        data = torch.nn.Flatten()(data)
+                        data = data.to('cpu')
+                        labels=labels.to('cpu')
+                        # ternary quantization to {-1, 0, 1}
+                        data = torch.where(
+                            data < -0.5,-1.0,
+                            torch.where(data > 0.5, 1.0, 0.0)).to(torch.float32)
+
+                        #Returns predictions as outputs shape[batch size,number of classes]
+                        output = compiled_model.forward(data)
+
+                        correct += (output.argmax(-1) == labels).float().sum()
+                        total += output.shape[0]
+                #Accuracy of compiled model
+                bin_acc_2inputs = correct / total
+                print('COMPILED BINARY MODEL 2INPUTS', num_bits , bin_acc_2inputs)
+
+                mlflow.log_metric(f"{num_bits}_bin_2inputs_testing_acc_3", bin_acc_2inputs)
+
 #End the run
 mlflow.end_run()
