@@ -621,6 +621,7 @@ void apply_logic_gate_net(bool const *inp, {BITS_TO_DTYPE[32]} *out, size_t len)
                     raise RuntimeError(f'Compilation failed with code {compiler_out.returncode}')
 
                 print(f'Compiled in {time.time()-t_s:.3f}s')
+                self.compilation_time=time.time()-t_s
 
             if save_lib_path is not None:
                 shutil.copy(lib_file.name, save_lib_path)

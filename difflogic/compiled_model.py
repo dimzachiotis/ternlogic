@@ -324,6 +324,7 @@ void apply_logic_gate_net (bool const *inp, {BITS_TO_DTYPE[32]} *out, size_t len
                         f'compilation exited with error code {compiler_out.returncode}')
 
                 print('Compiling finished in {:.3f} seconds.'.format(time.time() - t_s))
+                self.compilation_time=time.time()-t_s
 
             if save_lib_path is not None:
                 shutil.copy(lib_file.name, save_lib_path)
