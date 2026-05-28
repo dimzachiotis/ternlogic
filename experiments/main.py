@@ -657,6 +657,7 @@ if __name__ == '__main__':
                 print('COMPILED BINARY MODEL 2INPUTS', num_bits , bin_acc_2inputs)
 
                 mlflow.log_metric(f"{num_bits}_bin_2inputs_testing_acc_3", bin_acc_2inputs)
+                mlflow.log_param("compilation_time_2inputs", compiled_binary.compilation_time)
 
 #End the run
 mlflow.end_run()
