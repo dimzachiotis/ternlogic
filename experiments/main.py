@@ -36,6 +36,7 @@ from difflogic.packbitstensor import PackTernaryTensor
 from difflogic.compiled_model import CompiledLogicNet
 from difflogic.compiled_ternary_model_python import CompiledTernaryPython
 from difflogic.compiled_ternary_to_binary_2inputs import CompiledTernaryBinaryNet2Inputs
+from difflogic.compiled_ternary_to_binary_mulinputs import CompiledTernaryBinaryNetMulInputs
 
 device ='cuda'
 #if no cuda available, then use cpu
@@ -621,7 +622,7 @@ if __name__ == '__main__':
                 )
 
                 #Creates a CompiledPython object
-                compiled_binary = CompiledTernaryBinaryNet2Inputs(
+                compiled_binary_2inputs = CompiledTernaryBinaryNet2Inputs(
                 model=model,
                 verbose=False,
                 num_bits=num_bits,
@@ -630,7 +631,7 @@ if __name__ == '__main__':
                 gates_used=gates_used
                 )
 
-                compiled_binary.compile(
+                compiled_binary_2inputs.compile(
                     opt_level=1 if args.num_layers * args.num_neurons < 50_000 else 0,
                     save_lib_path=save_lib_path,
                     verbose=False
@@ -648,7 +649,7 @@ if __name__ == '__main__':
                             torch.where(data > 0.5, 1.0, 0.0)).to(torch.float32)
 
                         #Returns predictions as outputs shape[batch size,number of classes]
-                        output = compiled_binary.forward(data)
+                        output = compiled_binary_2inputs.forward(data)
 
                         correct += (output.argmax(-1) == labels).float().sum()
                         total += output.shape[0]
@@ -657,7 +658,61 @@ if __name__ == '__main__':
                 print('COMPILED BINARY MODEL 2INPUTS', num_bits , bin_acc_2inputs)
 
                 mlflow.log_metric(f"{num_bits}_bin_2inputs_testing_acc_3", bin_acc_2inputs)
-                mlflow.log_param("compilation_time_2inputs", compiled_binary.compilation_time)
+                mlflow.log_param("compilation_time_2inputs", compiled_binary_2inputs.compilation_time)
+
+    if args.compile_binary:
+        print('\n' + '='*80)
+        print(' Compiling model to Binary Mulinputs...')
+        print('='*80)
+        for num_bits in [
+                # 8,
+                # 16,
+                # 32,
+                64
+            ]:
+                os.makedirs('lib', exist_ok=True)
+                save_lib_path = 'lib/{:08d}_{}_binary_mulinputs.so'.format(
+                    args.experiment_id if args.experiment_id is not None else 0, num_bits
+                )
+
+                #Creates a CompiledPython object
+                compiled_binary_mulinputs = CompiledTernaryBinaryNetMulInputs(
+                model=model,
+                verbose=False,
+                num_bits=num_bits,
+                cpu_compiler='gcc',
+                device='cpu',
+                gates_used=gates_used
+                )
+
+                compiled_binary_mulinputs.compile(
+                    opt_level=1 if args.num_layers * args.num_neurons < 50_000 else 0,
+                    save_lib_path=save_lib_path,
+                    verbose=False
+                )
+                correct, total = 0, 0
+                with torch.no_grad():
+                    for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
+                        #flattens the input tensor to 1D per sample . shape[batch size,product of dimesions of data]
+                        data = torch.nn.Flatten()(data)
+                        data = data.to('cpu')
+                        labels=labels.to('cpu')
+                        # ternary quantization to {-1, 0, 1}
+                        data = torch.where(
+                            data < -0.5,-1.0,
+                            torch.where(data > 0.5, 1.0, 0.0)).to(torch.float32)
+
+                        #Returns predictions as outputs shape[batch size,number of classes]
+                        output = compiled_binary_mulinputs.forward(data)
+
+                        correct += (output.argmax(-1) == labels).float().sum()
+                        total += output.shape[0]
+                #Accuracy of compiled model
+                bin_acc_mulinputs = correct / total
+                print('COMPILED BINARY MODEL MULINPUTS', num_bits , bin_acc_mulinputs)
+
+                mlflow.log_metric(f"{num_bits}_bin_mulinputs_testing_acc_3", bin_acc_2inputs)
+                mlflow.log_param("compilation_time_mulinputs", compiled_binary_mulinputs.compilation_time)
 
 #End the run
 mlflow.end_run()
