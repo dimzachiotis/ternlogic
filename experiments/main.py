@@ -714,5 +714,27 @@ if __name__ == '__main__':
                 mlflow.log_metric(f"{num_bits}_bin_mulinputs_testing_acc_3", bin_acc_2inputs)
                 mlflow.log_param("compilation_time_mulinputs", compiled_binary_mulinputs.compilation_time)
 
+    # ==================================================================================
+    #  Save and Log the Model
+    # ==================================================================================
+    print('\n' + '='*80)
+    print(' Logging model natively to MLflow tracking space...')
+    print('='*80)
+    
+    # 1. Define the descriptive filename
+    run_name = f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tau{args.tau}_gradfactor{args.grad_factor}_tern"
+    model_filename = f"model_{exp_name}_{run_name}.pt"
+    
+    # 2. Save it temporarily in your current working space
+    torch.save(model, model_filename)
+    
+    # 3. Log it. MLflow automatically copies it into the correct mlruns folder 
+    # and instantly registers it so it shows up in your browser UI.
+    mlflow.log_artifact(local_path=model_filename)
+    
+    # 4. Delete the temporary file copy out of your workspace directory
+    if os.path.exists(model_filename):
+        os.remove(model_filename)
+        
 #End the run
 mlflow.end_run()
