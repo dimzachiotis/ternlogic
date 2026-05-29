@@ -582,10 +582,10 @@ if __name__ == '__main__':
         mlflow.log_metrics(final_metrics, step=args.num_iterations)
 
         area2inputs=compiled_model.network_area_2inputs(gates_used,total_stats)
-        mlflow.log_param("area_2inputs", area2inputs)
+        mlflow.log_param("area_2inputs", round(area2inputs, 3))
 
         areamulinputs=compiled_model.network_area_mul_inputs(gates_used,total_stats)
-        mlflow.log_param("area_mul_inputs", areamulinputs)
+        mlflow.log_param("area_mul_inputs", round(areamulinputs, 3))
 
         depth2inputs=compiled_model.network_depth_2inputs(gates_used)
         mlflow.log_param("depth_2inputs", depth2inputs)
