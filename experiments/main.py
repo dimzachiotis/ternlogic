@@ -22,6 +22,7 @@ import uci_datasets
 
 shared_artifacts = "file:////home/dzachiotis/thesis/mlflow_shared/mlruns"
 shared_db_url = "sqlite:////home/dzachiotis/thesis/mlflow_shared/mlflow.db"
+c_shared_uri = "file:////home/dzachiotis/thesis/mlflow_shared/c_files"
 mlflow.set_tracking_uri(shared_db_url)
 
 #Custom logic-based neural network components
@@ -616,10 +617,10 @@ if __name__ == '__main__':
                 # 32,
                 64
             ]:
-                os.makedirs('lib', exist_ok=True)
-                save_lib_path = 'lib/{:08d}_{}_binary_2inputs.so'.format(
-                    args.experiment_id if args.experiment_id is not None else 0, num_bits
-                )
+                clean_c_path = c_shared_uri.replace("file://", "") 
+                os.makedirs(clean_c_path, exist_ok=True)
+                run_name = f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tau{args.tau}_gradfactor{args.grad_factor}_tern"
+                save_lib_path = os.path.join(clean_c_path, f"model_{exp_name}_{run_name}_{num_bits}_bits_2inputs.so")
 
                 #Creates a CompiledPython object
                 compiled_binary_2inputs = CompiledTernaryBinaryNet2Inputs(
@@ -636,6 +637,14 @@ if __name__ == '__main__':
                     save_lib_path=save_lib_path,
                     verbose=False
                 )
+
+                if os.path.exists(save_lib_path):
+                    # This indexes the file so it instantly appears in the MLflow UI
+                    mlflow.log_artifact(local_path=save_lib_path)
+                    print("Shared library (.so) successfully indexed and visible in MLflow UI!")
+                else:
+                    print(f"Error: Compiled file missing at {save_lib_path}, could not log to MLflow.")
+                
                 correct, total = 0, 0
                 with torch.no_grad():
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
@@ -670,10 +679,10 @@ if __name__ == '__main__':
                 # 32,
                 64
             ]:
-                os.makedirs('lib', exist_ok=True)
-                save_lib_path = 'lib/{:08d}_{}_binary_mulinputs.so'.format(
-                    args.experiment_id if args.experiment_id is not None else 0, num_bits
-                )
+                clean_c_path = c_shared_uri.replace("file://", "") 
+                os.makedirs(clean_c_path, exist_ok=True)
+                run_name = f"{args.dataset}_k{args.num_neurons}_l{args.num_layers}_seed{args.seed}_lr{args.learning_rate}_tau{args.tau}_gradfactor{args.grad_factor}_tern"
+                save_lib_path = os.path.join(clean_c_path, f"model_{exp_name}_{run_name}_{num_bits}_bits_mulinputs.so")
 
                 #Creates a CompiledPython object
                 compiled_binary_mulinputs = CompiledTernaryBinaryNetMulInputs(
@@ -690,6 +699,14 @@ if __name__ == '__main__':
                     save_lib_path=save_lib_path,
                     verbose=False
                 )
+
+                if os.path.exists(save_lib_path):
+                    # This indexes the file so it instantly appears in the MLflow UI
+                    mlflow.log_artifact(local_path=save_lib_path)
+                    print("Shared library (.so) successfully indexed and visible in MLflow UI!")
+                else:
+                    print(f"Error: Compiled file missing at {save_lib_path}, could not log to MLflow.")
+                
                 correct, total = 0, 0
                 with torch.no_grad():
                     for (data, labels) in torch.utils.data.DataLoader(test_loader.dataset, batch_size=int(1e6), shuffle=False):
