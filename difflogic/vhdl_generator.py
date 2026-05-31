@@ -168,7 +168,131 @@ class VHDLGenerator:
             f.write("\n".join(lines))
         print(f"Generated: {output_path}")
 
-    def generate_all(self, output_dir=".",file_name="ternary_network.vhd"):
+    def generate_network_no_adder_vhdl(self, output_path="ternary_network.vhd"):
+        """
+        Generates top-level VHDL structural file connecting all layers.
+        GroupSum has been removed; outputs are raw 2-bit dual-polarity signals.
+        """
+        lines = [
+            "library IEEE;",
+            "use IEEE.STD_LOGIC_1164.ALL;",
+            "",
+            "entity ternary_to_binary_network_no_adder is",
+            "    port (",
+            # 2 bits per input for dual-polarity encoding
+            f"        inputs  : in  std_logic_vector({self.num_inputs * 2 - 1} downto 0);",
+            # 2 bits per final layer neuron (no accumulation)
+            f"        outputs : out std_logic_vector({self.last_layer_neurons * 2 - 1} downto 0)",
+            "    );",
+            "end ternary_to_binary_network_no_adder;",
+            "",
+            "architecture Structural of ternary_to_binary_network_no_adder is",
+            "",
+        ]
+
+        # Declare intermediate signal vectors for each layer output
+        for idx, (layer_a, _, _) in enumerate(self.layers):
+            num_neurons = len(layer_a)
+            lines.append(
+                f"    signal layer_{idx}_out : std_logic_vector({num_neurons * 2 - 1} downto 0);"
+            )
+
+        lines.extend(["", "begin", ""])
+
+        # Instantiate gate entities layer by layer
+        for idx, (layer_a, layer_b, layer_op) in enumerate(self.layers):
+            lines.append(f"    -- ===== LAYER {idx} =====")
+            num_neurons = len(layer_a)
+
+            for i in range(num_neurons):
+                op    = int(self.gates_used[layer_op[i].item()])
+                a_idx = int(layer_a[i].item())
+                b_idx = int(layer_b[i].item())
+
+                if idx == 0:
+                    src_a = f"inputs({a_idx * 2 + 1} downto {a_idx * 2})"
+                    src_b = f"inputs({b_idx * 2 + 1} downto {b_idx * 2})"
+                else:
+                    src_a = f"layer_{idx-1}_out({a_idx * 2 + 1} downto {a_idx * 2})"
+                    src_b = f"layer_{idx-1}_out({b_idx * 2 + 1} downto {b_idx * 2})"
+
+                dst = f"layer_{idx}_out({i * 2 + 1} downto {i * 2})"
+
+                lines.append(f"    gate_l{idx}_n{i} : entity work.gate_id_{op}")
+                lines.append(f"        port map (A => {src_a}, B => {src_b}, Y => {dst});")
+
+            lines.append("")
+
+        # Directly route the final layer to the outputs port
+        last_idx = len(self.layers) - 1
+        lines.extend([
+            "    -- ===== OUTPUT ASSIGNMENT =====",
+            "    -- Bypassing GroupSum: Outputting raw ternary signals from the final layer",
+            f"    outputs <= layer_{last_idx}_out;",
+            "",
+            "end Structural;",
+        ])
+
+        with open(output_path, "w") as f:
+            f.write("\n".join(lines))
+        print(f"Generated: {output_path}")
+
+    def generate_adder_vhdl(self, output_path="ternary_adder.vhd"):
+        """
+        Generates a standalone GroupSum adder module.
+        Takes raw 2-bit dual-polarity signals and outputs packed signed binary scores.
+        """
+        lines = [
+            "library IEEE;",
+            "use IEEE.STD_LOGIC_1164.ALL;",
+            "use IEEE.NUMERIC_STD.ALL;",
+            "",
+            "entity ternary_groupsum_adder is",
+            "    port (",
+            f"        ternary_inputs : in  std_logic_vector({self.last_layer_neurons * 2 - 1} downto 0);",
+            f"        binary_outputs : out std_logic_vector({self.num_classes * self.sum_width - 1} downto 0)",
+            "    );",
+            "end ternary_groupsum_adder;",
+            "",
+            "architecture Behavioral of ternary_groupsum_adder is",
+            "begin",
+            "",
+            "    process(ternary_inputs)",
+            f"        variable class_accum : signed({self.sum_width - 1} downto 0);",
+            "        variable raw_bits    : std_logic_vector(1 downto 0);",
+            f"        variable item_val    : signed({self.sum_width - 1} downto 0);",
+            "    begin",
+            f"        for c in 0 to {self.num_classes - 1} loop",
+            "            class_accum := (others => '0');",
+            f"            for n in 0 to {self.neurons_per_class - 1} loop",
+            # Extract 2-bit dual-polarity slice for neuron n of class c
+            f"                raw_bits := ternary_inputs(((c * {self.neurons_per_class} + n) * 2 + 1) downto ((c * {self.neurons_per_class} + n) * 2));",
+            "                ",
+            "                -- Decode dual-polarity encoding:",
+            '                if raw_bits = "10" then',
+            f"                    item_val := to_signed(1, {self.sum_width});",
+            '                elsif raw_bits = "01" then',
+            f"                    item_val := to_signed(-1, {self.sum_width});",
+            "                else",
+            "                    item_val := (others => '0');",
+            "                end if;",
+            "                ",
+            "                class_accum := class_accum + item_val;",
+            "            end loop;",
+            "            ",
+            # Write out accumulated signed value
+            f"            binary_outputs((c + 1) * {self.sum_width} - 1 downto c * {self.sum_width}) <= std_logic_vector(class_accum);",
+            "        end loop;",
+            "    end process;",
+            "",
+            "end Behavioral;",
+        ]
+
+        with open(output_path, "w") as f:
+            f.write("\n".join(lines))
+        print(f"Generated Standalone Adder: {output_path}")
+
+    def generate_all(self, output_dir=".",file_name="ternary_network"):
         """
         Generates the top-level network VHDL file and prints
         the list of required gate files that must already exist.
@@ -180,5 +304,11 @@ class VHDLGenerator:
 
         # Generate top-level network
         self.generate_network_vhdl(
-            os.path.join(output_dir, file_name)
+            os.path.join(output_dir, f"model_{file_name}.vhd")
+        )
+        self.generate_network_no_adder_vhdl(
+            os.path.join(output_dir, f"model_no_adder_{file_name}.vhd")
+        )
+        self.generate_adder_vhdl(
+            os.path.join(output_dir, f"adder_{file_name}.vhd")
         )
