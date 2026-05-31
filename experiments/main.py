@@ -38,6 +38,7 @@ from difflogic.compiled_model import CompiledLogicNet
 from difflogic.compiled_ternary_model_python import CompiledTernaryPython
 from difflogic.compiled_ternary_to_binary_2inputs import CompiledTernaryBinaryNet2Inputs
 from difflogic.compiled_ternary_to_binary_mulinputs import CompiledTernaryBinaryNetMulInputs
+from difflogic.vhdl_generator import VHDLGenerator
 
 device ='cuda'
 #if no cuda available, then use cpu
@@ -730,6 +731,12 @@ if __name__ == '__main__':
 
                 mlflow.log_metric(f"{num_bits}_bin_mulinputs_testing_acc_3", bin_acc_2inputs)
                 mlflow.log_param("compilation_time_mulinputs", compiled_binary_mulinputs.compilation_time)
+
+    # ==================================================================================
+    #  Create VHDL Files
+    # ==================================================================================
+    generator = VHDLGenerator(model=model, device='cpu', num_bits=64, gates_used=gates_used)
+    generator.generate_all(output_dir=f"//home/dzachiotis/thesis/vhdl_files/{exp_name}",file_name=f"{exp_name}_{run_name}_{num_bits}")
 
     # ==================================================================================
     #  Save and Log the Model

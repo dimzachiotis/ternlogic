@@ -227,7 +227,6 @@ class VHDLGenerator:
         last_idx = len(self.layers) - 1
         lines.extend([
             "    -- ===== OUTPUT ASSIGNMENT =====",
-            "    -- Bypassing GroupSum: Outputting raw ternary signals from the final layer",
             f"    outputs <= layer_{last_idx}_out;",
             "",
             "end Structural;",
@@ -304,11 +303,11 @@ class VHDLGenerator:
 
         # Generate top-level network
         self.generate_network_vhdl(
-            os.path.join(output_dir, f"model_{file_name}.vhd")
+            os.path.join(output_dir, f"network_{file_name}.vhd")
         )
         self.generate_network_no_adder_vhdl(
-            os.path.join(output_dir, f"model_no_adder_{file_name}.vhd")
+            os.path.join(output_dir, f"network_no_adder_{file_name}.vhd")
         )
         self.generate_adder_vhdl(
-            os.path.join(output_dir, f"adder_{file_name}.vhd")
+            os.path.join(output_dir, f"network_adder_{file_name}.vhd")
         )
