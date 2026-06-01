@@ -102,7 +102,7 @@ class VHDLGenerator:
             num_neurons = len(layer_a)
 
             for i in range(num_neurons):
-                op    = int(self.gates_used[layer_op[i].item()])
+                op = int(self.gates_used[int(layer_op[i].item())])
                 a_idx = int(layer_a[i].item())
                 b_idx = int(layer_b[i].item())
 
@@ -205,7 +205,7 @@ class VHDLGenerator:
             num_neurons = len(layer_a)
 
             for i in range(num_neurons):
-                op    = int(self.gates_used[layer_op[i].item()])
+                op = int(self.gates_used[int(layer_op[i].item())])
                 a_idx = int(layer_a[i].item())
                 b_idx = int(layer_b[i].item())
 
