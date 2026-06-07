@@ -6,7 +6,7 @@ import os
 
 # --- Configuration ---
 output_dir = "/home/dzachiotis/thesis/graphs/"
-filename = "group1_6_vs_group1_7_vs_group1_8_vs_group1_11_vs_group1_17_vs_bin_points.png"
+filename = "binary_baseline_vs_group1_6_baseline.png"
 target_lr = 0.01
 
 if not os.path.exists(output_dir):
@@ -50,21 +50,17 @@ def get_all_architectures(exp_name, metric_name, target_lr=None):
     return summary.sort_values('kl')
 
 # # --- 1. Get Data (All points, no filtering for max) ---
-# all_group1_11 = get_all_architectures("group1_11", "64_tern_testing_acc_3", target_lr=target_lr)
-# print(all_group1_11)
-all_group1_17 = get_all_architectures("group1_17", "64_tern_testing_acc_3", target_lr=target_lr)
-print(all_group1_17)
-# all_group1_6 = get_all_architectures("group1_6", "64_tern_testing_acc_3", target_lr=target_lr)
-# print(all_group1_6)
+all_group1_6 = get_all_architectures("group1_6_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
+print(all_group1_6)
 # all_group1_8 = get_all_architectures("group1_8", "64_tern_testing_acc_3", target_lr=target_lr)
 # print(all_group1_8)
 # all_group1_7 = get_all_architectures("group1_7", "64_tern_testing_acc_3", target_lr=target_lr)
 # print(all_group1_7)
-# all_bin = get_all_architectures("binary baseline mnist", "64_bin_testing_acc")
+all_bin = get_all_architectures("binary_baseline_mnist", "64_bin_testing_acc")
 # print(all_bin)
 
 # # --- 2. Create Scatter Plot ---
-# fig, ax = plt.subplots(figsize=(14, 9))
+fig, ax = plt.subplots(figsize=(14, 9))
 
 # ax.scatter(all_group1_11['kl'], all_group1_11['mean_acc'], 
 #            label='Ternary Group 1.11',  # Unique Label
@@ -83,15 +79,15 @@ print(all_group1_17)
 #            label='Ternary Group 1.8',  # Unique Label
 #            color='#1f77b4', marker='o', s=100, alpha=0.7, edgecolors='black')
 
-# # Scatter Ternary Group 1
-# ax.scatter(all_group1_6['kl'], all_group1_6['mean_acc'], 
-#            label='Ternary Group 1.6',  # Unique Label
-#            color="#1fb458", marker='<', s=100, alpha=0.7, edgecolors='black')
+# Scatter Ternary Group 1
+ax.scatter(all_group1_6['kl'], all_group1_6['mean_acc'], 
+           label='Ternary Group 1.6',  # Unique Label
+           color="#1fb458", marker='o', s=100, alpha=0.7, edgecolors='black')
 
-# # Scatter Binary
-# ax.scatter(all_bin['kl'], all_bin['mean_acc'], 
-#            label='Binary Architectures', 
-#            color='#d62728', marker='s', s=80, alpha=0.6, edgecolors='black')
+# Scatter Binary
+ax.scatter(all_bin['kl'], all_bin['mean_acc'], 
+           label='Binary Architectures', 
+           color='#d62728', marker='s', s=80, alpha=0.6, edgecolors='black')
 
 # # --- 3. Annotations ---
 # # Labeling every point with its (k, l)
@@ -119,31 +115,31 @@ print(all_group1_17)
 #                 textcoords="offset points", xytext=(0, 10), 
 #                 ha='center', fontsize=8, color='#1f77b4')
     
-# for _, row in all_group1_6.iterrows():
-#     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
-#                 (row['kl'], row['mean_acc']), 
-#                 textcoords="offset points", xytext=(0, 10), 
-#                 ha='center', fontsize=8, color="#1fb458")
+for _, row in all_group1_6.iterrows():
+    ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+                (row['kl'], row['mean_acc']), 
+                textcoords="offset points", xytext=(0, 10), 
+                ha='center', fontsize=8, color="#1fb458")
 
-# for _, row in all_bin.iterrows():
-#     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
-#                 (row['kl'], row['mean_acc']), 
-#                 textcoords="offset points", xytext=(0, -15), 
-#                 ha='center', fontsize=8, color='#d62728')
+for _, row in all_bin.iterrows():
+    ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+                (row['kl'], row['mean_acc']), 
+                textcoords="offset points", xytext=(0, -15), 
+                ha='center', fontsize=8, color='#d62728')
 
 # # --- 4. Formatting ---
-# ax.set_xscale('log')
-# ax.set_xlabel('Total Neurons ($k \\times l$)', fontsize=13)
-# ax.set_ylabel('Mean Test Accuracy', fontsize=13)
-# ax.set_title('Architecture Comparison: All Configurations (Ternary vs. Binary)', fontsize=16, pad=20)
-# ax.grid(True, which='both', linestyle='--', alpha=0.4)
-# ax.legend(loc='lower right', fontsize=12)
+ax.set_xscale('log')
+ax.set_xlabel('Total Neurons ($k \\times l$)', fontsize=13)
+ax.set_ylabel('Mean Test Accuracy', fontsize=13)
+ax.set_title('Architecture Comparison: All Configurations (Ternary vs. Binary)', fontsize=16, pad=20)
+ax.grid(True, which='both', linestyle='--', alpha=0.4)
+ax.legend(loc='lower right', fontsize=12)
 
-# # Adjust Y-axis to see the spread clearly
-# ax.set_ylim(min(all_bin['mean_acc'].min(), all_group1_7['mean_acc'].min()) - 0.05, 1.0)
+# Adjust Y-axis to see the spread clearly
+ax.set_ylim(min(all_bin['mean_acc'].min(), all_group1_6['mean_acc'].min()) - 0.05, 1.0)
 
-# plt.tight_layout()
-# plt.savefig(full_path, dpi=200)
-# plt.show()
+plt.tight_layout()
+plt.savefig(full_path, dpi=200)
+plt.show()
 
-# print("Scatter plot generated showing all architecture variations.")
+print("Scatter plot generated showing all architecture variations.")
