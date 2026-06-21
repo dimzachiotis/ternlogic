@@ -77,6 +77,8 @@ def get_all_architectures(exp_name, metric_name, target_lr=None):
     return summary
 
 # --- 1. Get Data ---
+all_group1_8 = get_all_architectures("group1_8_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
+all_group1_7 = get_all_architectures("group1_7_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
 all_group1_6 = get_all_architectures("group1_6_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
 all_bin = get_all_architectures("binary_baseline_mnist", "64_bin_testing_acc")
 
@@ -85,13 +87,13 @@ plot_modes = [
     {
         "name": "multiple_inputs",
         "ternary_col": "mean_area_mul",
-        "filename": "binary_baseline_vs_group1_6_area_mul_inputs.png",
+        "filename": "binary_baseline_vs_group1_6_vs_group1_7_vs_group1_8_area_mul_inputs.png",
         "title": "Architecture Comparison: Accuracy vs Mean Area (Multiple Inputs)"
     },
     {
         "name": "2_inputs",
         "ternary_col": "mean_area_2inputs",
-        "filename": "binary_baseline_vs_group1_6_area_2inputs.png",
+        "filename": "binary_baseline_vs_group1_6_vs_group1_7_vs_group1_8_area_2inputs.png",
         "title": "Architecture Comparison: Accuracy vs Mean Area (2-Inputs)"
     }
 ]
@@ -102,7 +104,17 @@ for mode in plot_modes:
     
     # Extract averaged area x-axis columns
     binary_x = all_bin['mean_area']
-    ternary_x = all_group1_6[mode['ternary_col']]
+    ternary_x = all_group1_8[mode['ternary_col']]
+
+    # Scatter Ternary Group 1.7
+    ax.scatter(ternary_x, all_group1_8['mean_acc'], 
+               label='Ternary Group 1.8', 
+               color='#1f77b4', marker='h', s=100, alpha=0.7, edgecolors='black')
+    
+    # Scatter Ternary Group 1.7
+    ax.scatter(ternary_x, all_group1_7['mean_acc'], 
+               label='Ternary Group 1.7', 
+               color="#2e1fb4", marker='>', s=100, alpha=0.7, edgecolors='black')
     
     # Scatter Ternary Group 1.6
     ax.scatter(ternary_x, all_group1_6['mean_acc'], 
@@ -115,6 +127,22 @@ for mode in plot_modes:
                color='#d62728', marker='s', s=80, alpha=0.6, edgecolors='black')
     
     # Annotate Ternary Points
+    for _, row in all_group1_8.iterrows():
+        x_val = row[mode['ternary_col']]
+        if pd.notna(x_val):
+            ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+                        (x_val, row['mean_acc']), 
+                        textcoords="offset points", xytext=(0, 10), 
+                        ha='center', fontsize=8, color='#1f77b4')
+
+    for _, row in all_group1_7.iterrows():
+        x_val = row[mode['ternary_col']]
+        if pd.notna(x_val):
+            ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+                        (x_val, row['mean_acc']), 
+                        textcoords="offset points", xytext=(0, 10), 
+                        ha='center', fontsize=8, color="#2e1fb4")
+            
     for _, row in all_group1_6.iterrows():
         x_val = row[mode['ternary_col']]
         if pd.notna(x_val):
@@ -141,7 +169,7 @@ for mode in plot_modes:
     ax.legend(loc='lower right', fontsize=12)
     
     # Adjust Y-axis to see the spread clearly
-    min_y = min(all_bin['mean_acc'].min(), all_group1_6['mean_acc'].min()) - 0.05
+    min_y = min(all_bin['mean_acc'].min(), all_group1_8['mean_acc'].min()) - 0.05
     ax.set_ylim(min_y, 1.0)
     
     plt.tight_layout()
