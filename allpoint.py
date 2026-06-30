@@ -6,7 +6,7 @@ import os
 
 # --- Configuration ---
 output_dir = "/home/dzachiotis/thesis/graphs/"
-filename = "binary_baseline_vs_group1_6_vs_group1_7_vs_group1_8_baseline.png"
+filename = "binary_baseline_vs_binary_baseline_residual.png"
 target_lr = 0.01
 
 if not os.path.exists(output_dir):
@@ -50,12 +50,14 @@ def get_all_architectures(exp_name, metric_name, target_lr=None):
     return summary.sort_values('kl')
 
 # # --- 1. Get Data (All points, no filtering for max) ---
-all_group1_7 = get_all_architectures("group1_7_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
-print(all_group1_7)
-all_group1_8 = get_all_architectures("group1_8_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
-print(all_group1_8)
-all_group1_6 = get_all_architectures("group1_6_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
-print(all_group1_6)
+# all_group1_7 = get_all_architectures("group1_7_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
+# print(all_group1_7)
+# all_group1_8 = get_all_architectures("group1_8_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
+# print(all_group1_8)
+# all_group1_6 = get_all_architectures("group1_6_baseline", "64_tern_testing_acc_3", target_lr=target_lr)
+# print(all_group1_6)
+all_bin_res = get_all_architectures("binary_baseline_mnist_residual", "64_bin_testing_acc")
+print(all_bin_res)
 all_bin = get_all_architectures("binary_baseline_mnist", "64_bin_testing_acc")
 print(all_bin)
 # print(all_bin)
@@ -71,18 +73,22 @@ fig, ax = plt.subplots(figsize=(14, 12))
 #            label='Ternary Group 1.17',  # Unique Label
 #            color="#faec2a", marker='h', s=100, alpha=0.7, edgecolors='black')
 
-ax.scatter(all_group1_7['kl'], all_group1_7['mean_acc'], 
-           label='Ternary Group 1.7',  # Unique Label
-           color="#2e1fb4", marker='>', s=100, alpha=0.7, edgecolors='black')
+# ax.scatter(all_group1_7['kl'], all_group1_7['mean_acc'], 
+#            label='Ternary Group 1.7',  # Unique Label
+#            color="#2e1fb4", marker='>', s=100, alpha=0.7, edgecolors='black')
 
-# Scatter Ternary Group 1
-ax.scatter(all_group1_8['kl'], all_group1_8['mean_acc'], 
-           label='Ternary Group 1.8',  # Unique Label
-           color='#1f77b4', marker='h', s=100, alpha=0.7, edgecolors='black')
+# # Scatter Ternary Group 1
+# ax.scatter(all_group1_8['kl'], all_group1_8['mean_acc'], 
+#            label='Ternary Group 1.8',  # Unique Label
+#            color='#1f77b4', marker='h', s=100, alpha=0.7, edgecolors='black')
 
-# Scatter Ternary Group 1
-ax.scatter(all_group1_6['kl'], all_group1_6['mean_acc'], 
-           label='Ternary Group 1.6',  # Unique Label
+# # Scatter Ternary Group 1
+# ax.scatter(all_group1_6['kl'], all_group1_6['mean_acc'], 
+#            label='Ternary Group 1.6',  # Unique Label
+#            color="#1fb458", marker='o', s=100, alpha=0.7, edgecolors='black')
+
+ax.scatter(all_bin_res['kl'], all_bin_res['mean_acc'], 
+           label='Binary Architectures Residual',  # Unique Label
            color="#1fb458", marker='o', s=100, alpha=0.7, edgecolors='black')
 
 # Scatter Binary
@@ -104,19 +110,24 @@ ax.scatter(all_bin['kl'], all_bin['mean_acc'],
 #                 textcoords="offset points", xytext=(10, 5), 
 #                 ha='left', fontsize=8, color="#faec2a")
     
-for _, row in all_group1_7.iterrows():
-    ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
-                (row['kl'], row['mean_acc']), 
-                textcoords="offset points", xytext=(10, 5), 
-                ha='left', fontsize=8, color="#2e1fb4")
+# for _, row in all_group1_7.iterrows():
+#     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+#                 (row['kl'], row['mean_acc']), 
+#                 textcoords="offset points", xytext=(10, 5), 
+#                 ha='left', fontsize=8, color="#2e1fb4")
 
-for _, row in all_group1_8.iterrows():
-    ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
-                (row['kl'], row['mean_acc']), 
-                textcoords="offset points", xytext=(0, 10), 
-                ha='center', fontsize=8, color='#1f77b4')
+# for _, row in all_group1_8.iterrows():
+#     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+#                 (row['kl'], row['mean_acc']), 
+#                 textcoords="offset points", xytext=(0, 10), 
+#                 ha='center', fontsize=8, color='#1f77b4')
     
-for _, row in all_group1_6.iterrows():
+# for _, row in all_group1_6.iterrows():
+#     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
+#                 (row['kl'], row['mean_acc']), 
+#                 textcoords="offset points", xytext=(0, 10), 
+#                 ha='center', fontsize=8, color="#1fb458")
+for _, row in all_bin_res.iterrows():
     ax.annotate(f"({int(row['k'])}, {int(row['l'])})", 
                 (row['kl'], row['mean_acc']), 
                 textcoords="offset points", xytext=(0, 10), 
@@ -132,12 +143,12 @@ for _, row in all_bin.iterrows():
 ax.set_xscale('log')
 ax.set_xlabel('Total Neurons ($k \\times l$)', fontsize=13)
 ax.set_ylabel('Mean Test Accuracy', fontsize=13)
-ax.set_title('Architecture Comparison: All Configurations (Ternary vs. Binary)', fontsize=16, pad=20)
+ax.set_title('Architecture Comparison: All Configurations (Binary Residual vs. Binary)', fontsize=16, pad=20)
 ax.grid(True, which='both', linestyle='--', alpha=0.4)
 ax.legend(loc='lower right', fontsize=12)
 
 # Adjust Y-axis to see the spread clearly
-ax.set_ylim(min(all_bin['mean_acc'].min(), all_group1_8['mean_acc'].min()) - 0.05, 1.0)
+ax.set_ylim(min(all_bin['mean_acc'].min(), all_bin_res['mean_acc'].min()) - 0.05, 1.0)
 
 plt.tight_layout()
 plt.savefig(full_path, dpi=200)
